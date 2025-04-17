@@ -23,7 +23,7 @@ import WishlistPage from '@/modules/wishlist/components/WishlistPage';
 import MarketplacePage from '@/modules/marketplace/components/MarketplacePage';
 import UserProfilePage from '@/modules/users/components/UserProfilePage';
 import ReportsPage from '@/modules/reports/components/ReportsPage';
-import MessagesPage from '@/modules/messages/components/MessagesPage';
+import MessagesPage from '@/modules/messages/components/MessagesPage.jsx';
 import NotificationsPage from '@/modules/notifications/components/NotificationsPage';
 import AdminDashboard from '@/modules/admin/components/AdminDashboard';
 import UserSettings from '@/modules/users/components/UserSettings';
