@@ -15,7 +15,7 @@ import LandingPage from '@/modules/core/components/LandingPage';
 // Dashboard and main features
 import Dashboard from '@/modules/dashboard/components/Dashboard';
 import CollectionsList from '@/modules/collections/components/CollectionsList';
-import CollectionDetails from '@/modules/collections/components/CollectionDetails';
+import CollectionDetails from '@/modules/collections/components/CollectionDetails.jsx';
 import ItemDetails from '@/modules/items/components/ItemDetails';
 import AddItemForm from '@/modules/items/components/AddItemForm';
 import EditItemForm from '@/modules/items/components/EditItemForm';
