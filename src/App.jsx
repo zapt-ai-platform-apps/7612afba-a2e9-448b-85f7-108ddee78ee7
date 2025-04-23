@@ -6,19 +6,15 @@ import { Toaster } from 'react-hot-toast';
 import MainLayout from '@/modules/core/components/layout/MainLayout';
 
 // Auth components
-import LoginPage from '@/modules/auth/components/LoginPage';
-import ProtectedRoute from '@/modules/auth/components/ProtectedRoute';
+import { LoginPage, ProtectedRoute } from '@/modules/auth';
 
 // Public pages
 import LandingPage from '@/modules/core/components/LandingPage';
 
 // Dashboard and main features
 import Dashboard from '@/modules/dashboard/components/Dashboard';
-import CollectionsList from '@/modules/collections/components/CollectionsList';
-import CollectionDetails from '@/modules/collections/components/CollectionDetails.jsx';
-import ItemDetails from '@/modules/items/components/ItemDetails';
-import AddItemForm from '@/modules/items/components/AddItemForm';
-import EditItemForm from '@/modules/items/components/EditItemForm';
+import { CollectionsList, CollectionDetails } from '@/modules/collections';
+import { ItemDetails, AddItemForm, EditItemForm } from '@/modules/items';
 import WishlistPage from '@/modules/wishlist/components/WishlistPage';
 import MarketplacePage from '@/modules/marketplace/components/MarketplacePage';
 import UserProfilePage from '@/modules/users/components/UserProfilePage';
