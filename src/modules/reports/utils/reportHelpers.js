@@ -4,6 +4,7 @@ import html2pdf from 'html2pdf.js';
  * Downloads a PDF file from HTML content
  * @param {string} htmlContent - The HTML content to convert to PDF
  * @param {string} fileName - The name of the file to download
+ * @returns {Promise<void>} - Promise that resolves when the PDF is downloaded
  */
 export const downloadPdf = (htmlContent, fileName) => {
   const options = {
@@ -22,10 +23,19 @@ export const downloadPdf = (htmlContent, fileName) => {
   document.body.appendChild(element);
   
   // Generate and download the PDF
-  return html2pdf().from(element).set(options).save().then(() => {
-    // Clean up
-    document.body.removeChild(element);
-  });
+  return html2pdf()
+    .from(element)
+    .set(options)
+    .save()
+    .then(() => {
+      // Clean up
+      document.body.removeChild(element);
+    })
+    .catch(err => {
+      console.error('Error generating PDF:', err);
+      document.body.removeChild(element);
+      throw err;
+    });
 };
 
 /**

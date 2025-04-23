@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/browser';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import toast from 'react-hot-toast';
 import { collectionsApi } from '@/modules/collections/api';
-import html2pdf from 'html2pdf.js';
+import { downloadPdf, downloadCsv, viewJsonInBrowser } from '@/modules/reports/utils/reportHelpers';
 
 export default function ReportsPage() {
   const { user } = useAuth();
@@ -61,43 +61,6 @@ export default function ReportsPage() {
     setOutputFormat(format);
   };
   
-  const downloadPdf = (htmlContent, fileName) => {
-    const options = {
-      margin: 10,
-      filename: fileName,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    };
-    
-    // Create a temporary div to render the HTML
-    const element = document.createElement('div');
-    element.innerHTML = htmlContent;
-    element.style.position = 'absolute';
-    element.style.left = '-9999px';
-    document.body.appendChild(element);
-    
-    // Generate and download the PDF
-    html2pdf().from(element).set(options).save().then(() => {
-      // Clean up
-      document.body.removeChild(element);
-    });
-  };
-  
-  const downloadCsv = (csvContent, fileName) => {
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    
-    // Create a download link and trigger it
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', fileName);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-  
   const handleGenerateReport = async () => {
     try {
       if (!selectedCollection) {
@@ -135,12 +98,8 @@ export default function ReportsPage() {
           // For CSV, response is handled directly as a blob
           downloadCsv(await response.text(), `${fileName}.csv`);
         } else {
-          // For JSON format or online view, we can display in a new tab
-          const dataStr = JSON.stringify(response.report, null, 2);
-          const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-          
-          // Open in a new tab
-          window.open(dataUri, '_blank');
+          // For JSON format or online view
+          viewJsonInBrowser(response.report);
         }
       } else {
         toast.error(response.error || 'Failed to generate report');
@@ -180,7 +139,7 @@ export default function ReportsPage() {
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin" role="status"></div>
       </div>
     );
   }

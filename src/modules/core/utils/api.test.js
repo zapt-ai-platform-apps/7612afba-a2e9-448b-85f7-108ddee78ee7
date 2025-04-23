@@ -28,8 +28,7 @@ describe('API utilities', () => {
     vi.clearAllMocks();
     global.fetch = mockFetch;
     
-    // Mock successful auth response - make sure this is clear
-    supabase.auth.getSession.mockReset();
+    // Default successful auth response - we'll override this in specific tests
     supabase.auth.getSession.mockResolvedValue({
       data: {
         session: {
@@ -68,25 +67,36 @@ describe('API utilities', () => {
     });
     
     it('should throw an error when session is not available', async () => {
-      // Mock a null session response
-      supabase.auth.getSession.mockResolvedValue({
+      // Explicitly mock a null session response for this specific test
+      supabase.auth.getSession.mockResolvedValueOnce({
         data: { session: null },
         error: null
       });
       
       // Expect the apiRequest to throw an error about missing session
       await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed: No valid session');
+      
+      // Verify session was checked
+      expect(supabase.auth.getSession).toHaveBeenCalled();
     });
     
     it('should throw an error when access token is missing', async () => {
-      // Mock a session without an access token
-      supabase.auth.getSession.mockResolvedValue({
-        data: { session: { user: { id: '123' } } },  // No access_token
+      // Mock a session without an access token for this specific test
+      supabase.auth.getSession.mockResolvedValueOnce({
+        data: { 
+          session: { 
+            user: { id: '123' } 
+            // No access_token property
+          } 
+        },
         error: null
       });
       
       // Expect the apiRequest to throw an error about missing access token
       await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed: No valid session');
+      
+      // Verify session was checked
+      expect(supabase.auth.getSession).toHaveBeenCalled();
     });
     
     it('should throw an error when fetch fails', async () => {
