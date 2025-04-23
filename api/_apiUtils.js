@@ -28,22 +28,54 @@ export async function authenticateUser(req) {
       throw new Error('Missing Authorization header');
     }
     
+    // Log auth header format (safely)
+    console.log('Auth header format:', 
+      authHeader.startsWith('Bearer ') ? 'Bearer [token]' : authHeader.substring(0, 15) + '...');
+    
+    // Check for Bearer prefix
+    if (!authHeader.startsWith('Bearer ')) {
+      throw new Error('Authorization header must start with Bearer');
+    }
+    
     const token = authHeader.split(' ')[1];
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    // Add token validation checks
+    if (!token) {
+      throw new Error('Token is missing from Authorization header');
+    }
+    
+    // Check token format (JWT has 3 parts separated by dots)
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      throw new Error(`Malformed token: expected 3 parts but got ${parts.length}`);
+    }
+    
+    console.log('Calling supabase.auth.getUser with token');
+    const { data, error } = await supabase.auth.getUser(token);
     
     if (error) {
       console.error('Authentication error:', error);
-      throw new Error('Invalid token');
+      throw new Error(`Invalid token: ${error.message}`);
     }
     
-    if (!user) {
-      throw new Error('User not found');
+    if (!data || !data.user) {
+      throw new Error('User not found in response');
     }
     
-    return user;
+    return data.user;
   } catch (error) {
     console.error('Authentication failed:', error);
-    Sentry.captureException(error);
+    Sentry.captureException(error, {
+      extra: {
+        path: req.url,
+        method: req.method,
+        headers: {
+          ...req.headers,
+          authorization: req.headers.authorization ? 
+            `${req.headers.authorization.substring(0, 15)}...` : 'none'
+        }
+      }
+    });
     throw error;
   }
 }
@@ -107,7 +139,10 @@ export function asyncHandler(handler) {
       
       // Determine appropriate status code
       let statusCode = 500;
-      if (error.message === 'Missing Authorization header' || error.message === 'Invalid token') {
+      if (error.message === 'Missing Authorization header' || 
+          error.message === 'Invalid token' || 
+          error.message.includes('Malformed token') ||
+          error.message.startsWith('Authorization header must')) {
         statusCode = 401;
       } else if (error.message === 'User not found' || error.message === 'Resource not found') {
         statusCode = 404;
