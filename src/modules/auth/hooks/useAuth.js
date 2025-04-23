@@ -11,7 +11,9 @@ export function useAuth() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [hasRecordedLogin, setHasRecordedLogin] = useState(false);
+  
+  // Using refs instead of state to avoid re-render cycles
+  const hasRecordedLoginRef = useRef(false);
   const hasSessionRef = useRef(false);
   
   // Use this function to update session so we also update our ref
@@ -22,7 +24,7 @@ export function useAuth() {
   
   // Fetch user profile
   const fetchUserProfile = useCallback(async () => {
-    if (!session) return;
+    if (!hasSessionRef.current) return;
     
     try {
       setError(null);
@@ -44,10 +46,12 @@ export function useAuth() {
       });
       // Don't set error state here either
     }
-  }, [session]);
+  }, []); // No dependencies to avoid re-creation
   
   // Setup auth state change listener
   useEffect(() => {
+    console.log('Setting up auth listener');
+    
     const checkSession = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
@@ -58,6 +62,19 @@ export function useAuth() {
         if (data.session) {
           setUser(data.session.user);
           hasSessionRef.current = true;
+          
+          // Try to record login only once
+          if (data.session?.user?.email && !hasRecordedLoginRef.current) {
+            try {
+              await recordLogin(data.session.user.email, import.meta.env.VITE_PUBLIC_APP_ENV);
+              hasRecordedLoginRef.current = true;
+            } catch (loginErr) {
+              console.error('Failed to record login:', loginErr);
+              Sentry.captureException(loginErr);
+              // Mark as recorded anyway to prevent retries
+              hasRecordedLoginRef.current = true;
+            }
+          }
         }
         
         // Fetch user profile if we have a session
@@ -86,9 +103,17 @@ export function useAuth() {
         if (!hasSessionRef.current) {
           updateSession(newSession);
           setUser(newSession?.user || null);
-          if (newSession?.user?.email) {
-            eventBus.publish(events.USER_SIGNED_IN, { user: newSession.user });
-            setHasRecordedLogin(false);
+          if (newSession?.user?.email && !hasRecordedLoginRef.current) {
+            try {
+              await recordLogin(newSession.user.email, import.meta.env.VITE_PUBLIC_APP_ENV);
+              hasRecordedLoginRef.current = true;
+              eventBus.publish(events.USER_SIGNED_IN, { user: newSession.user });
+            } catch (err) {
+              console.error('Failed to record login:', err);
+              Sentry.captureException(err);
+              // Mark as recorded anyway to prevent retries
+              hasRecordedLoginRef.current = true;
+            }
           }
           
           // Fetch user profile after sign in
@@ -107,8 +132,8 @@ export function useAuth() {
         updateSession(null);
         setUser(null);
         setProfile(null);
+        hasRecordedLoginRef.current = false;
         eventBus.publish(events.USER_SIGNED_OUT, {});
-        setHasRecordedLogin(false);
       }
     });
     
@@ -116,20 +141,6 @@ export function useAuth() {
       authListener?.subscription.unsubscribe();
     };
   }, [updateSession, fetchUserProfile]);
-  
-  // Record login when session changes
-  useEffect(() => {
-    if (session?.user?.email && !hasRecordedLogin) {
-      recordLogin(session.user.email, import.meta.env.VITE_PUBLIC_APP_ENV)
-        .then(() => setHasRecordedLogin(true))
-        .catch((error) => {
-          console.error('Failed to record login:', error);
-          Sentry.captureException(error, {
-            extra: { context: 'useAuth.recordLogin' }
-          });
-        });
-    }
-  }, [session, hasRecordedLogin]);
   
   // Update user profile
   const updateProfile = useCallback(async (profileData) => {
