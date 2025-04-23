@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { fetchUserProfile, updateUserProfile } from '@/modules/users/api';
+import { usersApi } from '@/modules/users/api';
 import * as Sentry from '@sentry/browser';
 
 function UserSettings() {
@@ -21,7 +21,7 @@ function UserSettings() {
     async function loadUserSettings() {
       try {
         setLoading(true);
-        const profile = await fetchUserProfile();
+        const profile = await usersApi.getUserProfile();
         
         if (profile.settings) {
           setUserSettings({
@@ -61,7 +61,7 @@ function UserSettings() {
   const handleSaveSettings = async () => {
     try {
       setSaving(true);
-      await updateUserProfile({ settings: userSettings });
+      await usersApi.updateUserProfile({ settings: userSettings });
       toast.success('Settings saved successfully!');
     } catch (error) {
       console.error('Failed to save settings:', error);
