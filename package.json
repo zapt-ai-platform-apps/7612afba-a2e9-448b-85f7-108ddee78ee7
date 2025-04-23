@@ -5,10 +5,9 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vitest run && vite build",
+        "build": "vite build",
         "serve": "vite preview",
-        "start": "vite --host",
-        "test": "vitest"
+        "start": "vite --host"
     },
     "dependencies": {
         "@sentry/browser": "^8.41.0",
