@@ -1,5 +1,7 @@
 import { initializeZapt } from '@zapt/zapt-js';
 import * as Sentry from '@sentry/node';
+import postgres from 'postgres';
+import { drizzle } from 'drizzle-orm/postgres-js';
 
 Sentry.init({
   dsn: process.env.VITE_PUBLIC_SENTRY_DSN,
@@ -87,9 +89,6 @@ export async function authenticateUser(req) {
  */
 export function createDbClient() {
   try {
-    const postgres = require('postgres');
-    const { drizzle } = require('drizzle-orm/postgres-js');
-    
     const dbUrl = process.env.COCKROACH_DB_URL;
     
     if (!dbUrl) {
