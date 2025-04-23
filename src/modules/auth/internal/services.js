@@ -3,6 +3,42 @@ import { api } from '@/modules/core/utils/api';
 import * as Sentry from '@sentry/browser';
 
 /**
+ * Get the current session
+ * @returns {Promise<Object>} - Current session data
+ */
+export async function getSession() {
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    return { data, error: null };
+  } catch (error) {
+    console.error('Get session error:', error);
+    Sentry.captureException(error, {
+      extra: { context: 'getSession' }
+    });
+    return { data: null, error };
+  }
+}
+
+/**
+ * Record user login for analytics
+ * @param {string} email - User email
+ * @returns {Promise<void>}
+ */
+export async function recordUserLogin(email) {
+  try {
+    await recordLogin(email, import.meta.env.VITE_PUBLIC_APP_ENV);
+    return { error: null };
+  } catch (error) {
+    console.error('Record login error:', error);
+    Sentry.captureException(error, {
+      extra: { context: 'recordUserLogin', email }
+    });
+    return { error };
+  }
+}
+
+/**
  * Sign in with email and password
  * @param {string} email - User email
  * @param {string} password - User password
