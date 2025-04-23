@@ -5,16 +5,17 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "vite build",
+        "build": "vitest run && vite build",
         "serve": "vite preview",
-        "start": "vite --host"
+        "start": "vite --host",
+        "test": "vitest"
     },
     "dependencies": {
         "@sentry/browser": "^8.41.0",
         "@sentry/node": "^8.54.0",
         "@supabase/auth-ui-react": "^0.4.7",
         "@supabase/auth-ui-shared": "^0.1.8",
-        "@zapt/zapt-js": "^1.0.23",
+        "@zapt/zapt-js": "^1.0.29",
         "date-fns": "^3.3.1",
         "drizzle-orm": "^0.33.0",
         "html2pdf.js": "^0.10.1",
