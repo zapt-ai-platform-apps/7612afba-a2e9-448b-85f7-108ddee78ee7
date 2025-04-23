@@ -1,9 +1,9 @@
 import React from 'react';
 import { AuthContext } from '../context/AuthContext';
-import { useAuthProvider } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuth';
 
 export function AuthProvider({ children }) {
-  const auth = useAuthProvider();
+  const auth = useAuth();
   
   return (
     <AuthContext.Provider value={auth}>
@@ -11,3 +11,5 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
+export default AuthProvider;
