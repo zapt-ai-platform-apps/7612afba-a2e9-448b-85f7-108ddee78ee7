@@ -27,12 +27,49 @@ import ChatWidget from '@/modules/messages/components/ChatWidget';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 
 export default function App() {
-  const { user, loading } = useAuth();
+  const { user, loading, error } = useAuth();
+  
+  // Check if critical environment variables are missing
+  const missingEnvVars = [];
+  if (!import.meta.env.VITE_PUBLIC_APP_ID) missingEnvVars.push('VITE_PUBLIC_APP_ID');
+  if (!import.meta.env.VITE_PUBLIC_APP_ENV) missingEnvVars.push('VITE_PUBLIC_APP_ENV');
+  if (!import.meta.env.VITE_PUBLIC_SENTRY_DSN) missingEnvVars.push('VITE_PUBLIC_SENTRY_DSN');
+  
+  if (missingEnvVars.length > 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col p-6">
+        <div className="text-red-600 font-bold text-xl mb-4">Configuration Error</div>
+        <div className="mb-4">Missing required environment variables:</div>
+        <ul className="list-disc pl-6 mb-4">
+          {missingEnvVars.map(envVar => (
+            <li key={envVar} className="font-mono">{envVar}</li>
+          ))}
+        </ul>
+        <div>Please check your <span className="font-mono">.env</span> file and make sure all required variables are set.</div>
+      </div>
+    );
+  }
   
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col">
+        <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div className="text-gray-600">Authenticating...</div>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col p-6">
+        <div className="text-red-600 font-bold text-xl mb-4">Authentication Error</div>
+        <div className="mb-4">{error}</div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer"
+        >
+          Try Again
+        </button>
       </div>
     );
   }

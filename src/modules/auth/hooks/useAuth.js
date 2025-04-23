@@ -15,6 +15,7 @@ export function useAuth() {
   // Using refs instead of state to avoid re-render cycles
   const hasRecordedLoginRef = useRef(false);
   const hasSessionRef = useRef(false);
+  const initialCheckDoneRef = useRef(false);
   
   // Use this function to update session so we also update our ref
   const updateSession = useCallback((newSession) => {
@@ -54,8 +55,25 @@ export function useAuth() {
     
     const checkSession = async () => {
       try {
+        // Safety check: make sure supabase is available
+        if (!supabase || !supabase.auth) {
+          console.error('Supabase client not properly initialized');
+          setError('Authentication service unavailable');
+          setLoading(false);
+          initialCheckDoneRef.current = true;
+          return;
+        }
+        
         const { data, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        if (error) {
+          console.error('Error getting session:', error);
+          setError('Failed to retrieve authentication session');
+          setLoading(false);
+          initialCheckDoneRef.current = true;
+          return;
+        }
+        
+        console.log('Session check completed', { hasSession: !!data.session });
         
         // Set initial session
         updateSession(data.session);
@@ -66,8 +84,10 @@ export function useAuth() {
           // Try to record login only once
           if (data.session?.user?.email && !hasRecordedLoginRef.current) {
             try {
-              await recordLogin(data.session.user.email, import.meta.env.VITE_PUBLIC_APP_ENV);
+              const appEnv = import.meta.env.VITE_PUBLIC_APP_ENV || 'development';
+              await recordLogin(data.session.user.email, appEnv);
               hasRecordedLoginRef.current = true;
+              console.log('Login recorded successfully');
             } catch (loginErr) {
               console.error('Failed to record login:', loginErr);
               Sentry.captureException(loginErr);
@@ -81,64 +101,92 @@ export function useAuth() {
         if (data.session) {
           await fetchUserProfile();
         }
-        
-        setLoading(false);
       } catch (error) {
         console.error('Error checking session:', error);
         Sentry.captureException(error, {
           extra: { context: 'useAuth.checkSession' }
         });
+        setError('Authentication error occurred');
+      } finally {
+        // Always set loading to false and mark initial check as done
         setLoading(false);
+        initialCheckDoneRef.current = true;
       }
     };
     
     checkSession();
     
-    // Set up auth state change listener
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      console.log('Auth event:', event, 'Has session:', hasSessionRef.current);
+    // Set up the auth listener
+    let authListener = null;
+    
+    const setupAuthListener = () => {
+      // Safety check: make sure supabase is available
+      if (!supabase || !supabase.auth) {
+        console.error('Cannot set up auth listener - Supabase client not properly initialized');
+        return;
+      }
       
-      // For SIGNED_IN, only update session if we don't have one
-      if (event === 'SIGNED_IN') {
-        if (!hasSessionRef.current) {
-          updateSession(newSession);
-          setUser(newSession?.user || null);
-          if (newSession?.user?.email && !hasRecordedLoginRef.current) {
-            try {
-              await recordLogin(newSession.user.email, import.meta.env.VITE_PUBLIC_APP_ENV);
-              hasRecordedLoginRef.current = true;
-              eventBus.publish(events.USER_SIGNED_IN, { user: newSession.user });
-            } catch (err) {
-              console.error('Failed to record login:', err);
-              Sentry.captureException(err);
-              // Mark as recorded anyway to prevent retries
-              hasRecordedLoginRef.current = true;
+      try {
+        console.log('Setting up auth state change listener');
+        const { data: listener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+          console.log('Auth event:', event, 'Has session:', hasSessionRef.current);
+          
+          // For SIGNED_IN, only update session if we don't have one
+          if (event === 'SIGNED_IN') {
+            if (!hasSessionRef.current) {
+              updateSession(newSession);
+              setUser(newSession?.user || null);
+              if (newSession?.user?.email && !hasRecordedLoginRef.current) {
+                try {
+                  const appEnv = import.meta.env.VITE_PUBLIC_APP_ENV || 'development';
+                  await recordLogin(newSession.user.email, appEnv);
+                  hasRecordedLoginRef.current = true;
+                  eventBus.publish(events.USER_SIGNED_IN, { user: newSession.user });
+                } catch (err) {
+                  console.error('Failed to record login:', err);
+                  Sentry.captureException(err);
+                  // Mark as recorded anyway to prevent retries
+                  hasRecordedLoginRef.current = true;
+                }
+              }
+              
+              // Fetch user profile after sign in
+              await fetchUserProfile();
+            } else {
+              console.log('Already have session, ignoring SIGNED_IN event');
             }
           }
-          
-          // Fetch user profile after sign in
-          await fetchUserProfile();
-        } else {
-          console.log('Already have session, ignoring SIGNED_IN event');
-        }
+          // For TOKEN_REFRESHED, always update the session
+          else if (event === 'TOKEN_REFRESHED') {
+            updateSession(newSession);
+            setUser(newSession?.user || null);
+          }
+          // For SIGNED_OUT, clear the session
+          else if (event === 'SIGNED_OUT') {
+            updateSession(null);
+            setUser(null);
+            setProfile(null);
+            hasRecordedLoginRef.current = false;
+            eventBus.publish(events.USER_SIGNED_OUT, {});
+          }
+        });
+        authListener = listener;
+      } catch (err) {
+        console.error('Error setting up auth listener:', err);
+        Sentry.captureException(err, {
+          extra: { context: 'useAuth.setupAuthListener' }
+        });
       }
-      // For TOKEN_REFRESHED, always update the session
-      else if (event === 'TOKEN_REFRESHED') {
-        updateSession(newSession);
-        setUser(newSession?.user || null);
-      }
-      // For SIGNED_OUT, clear the session
-      else if (event === 'SIGNED_OUT') {
-        updateSession(null);
-        setUser(null);
-        setProfile(null);
-        hasRecordedLoginRef.current = false;
-        eventBus.publish(events.USER_SIGNED_OUT, {});
-      }
-    });
+    };
+    
+    // Start setting up the listener immediately to catch any auth events
+    setupAuthListener();
     
     return () => {
-      authListener?.subscription.unsubscribe();
+      if (authListener && authListener.subscription) {
+        console.log('Unsubscribing from auth listener');
+        authListener.subscription.unsubscribe();
+      }
     };
   }, [updateSession, fetchUserProfile]);
   
@@ -166,6 +214,11 @@ export function useAuth() {
   const signOut = useCallback(async () => {
     try {
       setError(null);
+      // Safety check: make sure supabase is available
+      if (!supabase || !supabase.auth) {
+        throw new Error('Supabase client not properly initialized');
+      }
+      
       const { error } = await authServices.signOut();
       if (error) throw error;
     } catch (err) {
