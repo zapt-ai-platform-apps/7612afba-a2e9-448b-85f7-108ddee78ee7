@@ -3,14 +3,16 @@ import { apiRequest, get, post, put, patch, del } from './api';
 import { supabase } from '@/supabaseClient';
 import * as Sentry from '@sentry/browser';
 
-// Mock dependencies
-vi.mock('@/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: vi.fn()
+// Mock dependencies with more detailed implementation
+vi.mock('@/supabaseClient', () => {
+  return {
+    supabase: {
+      auth: {
+        getSession: vi.fn()
+      }
     }
-  }
-}));
+  };
+});
 
 vi.mock('@sentry/browser', () => ({
   captureException: vi.fn()
@@ -18,15 +20,16 @@ vi.mock('@sentry/browser', () => ({
 
 describe('API utilities', () => {
   // Mock fetch
+  const originalFetch = global.fetch;
   const mockFetch = vi.fn();
-  global.fetch = mockFetch;
-
-  // Setup mock responses
+  
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
+    global.fetch = mockFetch;
     
-    // Mock successful auth response
+    // Mock successful auth response - make sure this is clear
+    supabase.auth.getSession.mockReset();
     supabase.auth.getSession.mockResolvedValue({
       data: {
         session: {
@@ -43,11 +46,20 @@ describe('API utilities', () => {
       text: async () => '{"success":true}'
     });
   });
+  
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
 
   describe('apiRequest', () => {
     it('should make a request with the correct authorization header', async () => {
+      // Call the function
       await apiRequest('/api/test');
       
+      // Verify the mock was called correctly
+      expect(supabase.auth.getSession).toHaveBeenCalled();
+      
+      // Verify fetch was called with the right parameters
       expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
         headers: expect.objectContaining({
           'Authorization': 'Bearer header.payload.signature'
@@ -56,21 +68,25 @@ describe('API utilities', () => {
     });
     
     it('should throw an error when session is not available', async () => {
+      // Mock a null session response
       supabase.auth.getSession.mockResolvedValue({
         data: { session: null },
         error: null
       });
       
-      await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed');
+      // Expect the apiRequest to throw an error about missing session
+      await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed: No valid session');
     });
     
-    it('should throw an error when session is invalid', async () => {
+    it('should throw an error when access token is missing', async () => {
+      // Mock a session without an access token
       supabase.auth.getSession.mockResolvedValue({
-        data: { session: {} },  // Missing access_token
+        data: { session: { user: { id: '123' } } },  // No access_token
         error: null
       });
       
-      await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed');
+      // Expect the apiRequest to throw an error about missing access token
+      await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed: No valid session');
     });
     
     it('should throw an error when fetch fails', async () => {

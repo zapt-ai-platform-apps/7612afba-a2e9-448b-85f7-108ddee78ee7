@@ -28,3 +28,26 @@ export async function updateUserProfile(profileData) {
     throw error;
   }
 }
+
+/**
+ * Fetches the current user's detailed profile with settings
+ * @returns {Promise<Object>} The user profile data with settings
+ */
+export async function getUserProfile() {
+  try {
+    console.log('Fetching user profile with settings');
+    return await get('/api/user');
+  } catch (error) {
+    console.error('Error fetching user profile with settings:', error);
+    throw error;
+  }
+}
+
+/**
+ * API client for user-related operations
+ */
+export const usersApi = {
+  getCurrentUser,
+  updateUserProfile,
+  getUserProfile
+};
