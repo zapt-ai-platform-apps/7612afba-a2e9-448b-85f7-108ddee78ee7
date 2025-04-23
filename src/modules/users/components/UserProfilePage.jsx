@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
-import { fetchUserProfile, updateUserProfile } from '@/modules/users/api';
+import { usersApi } from '@/modules/users/api';
 import * as Sentry from '@sentry/browser';
 
 function UserProfilePage() {
@@ -29,7 +29,7 @@ function UserProfilePage() {
     async function loadUserProfile() {
       try {
         setLoading(true);
-        const profileData = await fetchUserProfile();
+        const profileData = await usersApi.getUserProfile();
         setProfile(profileData);
         
         // Initialize form with profile data
@@ -94,7 +94,7 @@ function UserProfilePage() {
     e.preventDefault();
     try {
       setUpdating(true);
-      const updatedProfile = await updateUserProfile(formData);
+      const updatedProfile = await usersApi.updateUserProfile(formData);
       setProfile(updatedProfile);
       toast.success('Profile updated successfully!');
     } catch (error) {
