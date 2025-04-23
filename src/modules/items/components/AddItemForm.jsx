@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { FaArrowLeft, FaUpload, FaTimes } from 'react-icons/fa';
+import { FaArrowLeft, FaUpload, FaCamera, FaFolderOpen } from 'react-icons/fa';
 import * as Sentry from '@sentry/browser';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import toast from 'react-hot-toast';
+import CurrencySelector from '@/modules/shared/components/CurrencySelector';
+import FileUploader from '@/modules/shared/components/FileUploader';
 
 export default function AddItemForm() {
   const { collectionId } = useParams();
@@ -14,6 +16,15 @@ export default function AddItemForm() {
   const [collection, setCollection] = useState(null);
   const [collectionLoading, setCollectionLoading] = useState(true);
   const [formFields, setFormFields] = useState([]);
+  const [filesUploading, setFilesUploading] = useState(false);
+  
+  // Separate images by category
+  const [itemImages, setItemImages] = useState([]);
+  const [packagingImages, setPackagingImages] = useState([]);
+  const [certificateImages, setCertificateImages] = useState([]);
+  const [proofOfPurchaseFiles, setProofOfPurchaseFiles] = useState([]);
+  
+  const [activeImageTab, setActiveImageTab] = useState('item');
   
   const [formData, setFormData] = useState({
     name: '',
@@ -23,8 +34,8 @@ export default function AddItemForm() {
     purchaseDate: '',
     purchasePlace: '',
     condition: '',
-    attributes: {},
-    images: []
+    currency: 'USD',
+    attributes: {}
   });
   
   // Fetch collection details
@@ -36,7 +47,7 @@ export default function AddItemForm() {
         // In a real app, this would be an API call
         // Simulating API call with timeout
         setTimeout(() => {
-          // Mock collection data
+          // Mock collection data based on the collectionId
           const mockCollection = {
             id: collectionId,
             name: 'Model Cars Collection',
@@ -117,32 +128,6 @@ export default function AddItemForm() {
     }));
   };
   
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files);
-    
-    if (files.length > 0) {
-      // In a real app, we would upload these to a storage service
-      // and get back URLs. For now, we'll use data URLs.
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setFormData(prev => ({
-            ...prev,
-            images: [...prev.images, reader.result]
-          }));
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-  };
-  
-  const removeImage = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
-  };
-  
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -163,6 +148,22 @@ export default function AddItemForm() {
     
     try {
       setLoading(true);
+      
+      // Combine all images
+      const allImages = [
+        ...itemImages.map(img => ({ category: 'item', url: img.preview || img })),
+        ...packagingImages.map(img => ({ category: 'packaging', url: img.preview || img })),
+        ...certificateImages.map(img => ({ category: 'certificate', url: img.preview || img }))
+      ];
+      
+      // In a real app, we would upload images to a storage service
+      
+      // Prepare proof of purchase files (in a real app, we would upload these files)
+      const proofOfPurchase = proofOfPurchaseFiles.map(file => ({
+        name: file.name,
+        type: file.type,
+        url: file.preview || file
+      }));
       
       // In a real app, this would be an API call to create the item
       // Simulating API call with timeout
@@ -268,39 +269,51 @@ export default function AddItemForm() {
           <div className="card">
             <div className="card-header">Purchase & Value</div>
             <div className="card-body">
-              <div className="form-control">
-                <label htmlFor="purchasePrice" className="form-label">Purchase Price</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                  <input
-                    type="text"
-                    id="purchasePrice"
-                    name="purchasePrice"
-                    value={formData.purchasePrice}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="form-control">
+                  <label htmlFor="currency" className="form-label">Currency</label>
+                  <CurrencySelector
+                    id="currency"
+                    name="currency"
+                    value={formData.currency}
                     onChange={handleChange}
-                    className="form-input pl-7 box-border"
-                    placeholder="0.00"
                   />
                 </div>
               </div>
               
-              <div className="form-control">
-                <label htmlFor="currentValue" className="form-label">Current Value</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                  <input
-                    type="text"
-                    id="currentValue"
-                    name="currentValue"
-                    value={formData.currentValue}
-                    onChange={handleChange}
-                    className="form-input pl-7 box-border"
-                    placeholder="0.00"
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div className="form-control">
+                  <label htmlFor="purchasePrice" className="form-label">Purchase Price</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="purchasePrice"
+                      name="purchasePrice"
+                      value={formData.purchasePrice}
+                      onChange={handleChange}
+                      className="form-input pl-7 box-border"
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+                
+                <div className="form-control">
+                  <label htmlFor="currentValue" className="form-label">Current Value</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      id="currentValue"
+                      name="currentValue"
+                      value={formData.currentValue}
+                      onChange={handleChange}
+                      className="form-input pl-7 box-border"
+                      placeholder="0.00"
+                    />
+                  </div>
                 </div>
               </div>
               
-              <div className="form-control">
+              <div className="form-control mt-4">
                 <label htmlFor="purchaseDate" className="form-label">Purchase Date</label>
                 <input
                   type="date"
@@ -312,7 +325,7 @@ export default function AddItemForm() {
                 />
               </div>
               
-              <div className="form-control">
+              <div className="form-control mt-4">
                 <label htmlFor="purchasePlace" className="form-label">Purchase Location</label>
                 <input
                   type="text"
@@ -373,46 +386,122 @@ export default function AddItemForm() {
         <div className="card">
           <div className="card-header">Images</div>
           <div className="card-body">
-            <div className="form-control">
-              <label className="form-label">Upload Images</label>
-              <div className="mt-2">
-                <label className="block relative">
-                  <span className="btn btn-outline inline-flex items-center cursor-pointer">
-                    <FaUpload className="mr-2" />
-                    Upload Images
-                  </span>
-                  <input
-                    type="file"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    accept="image/*"
-                  />
-                </label>
-                <p className="mt-1 text-sm text-gray-500">Upload up to 5 images of your item</p>
+            <div className="mb-4">
+              <div className="flex border-b border-gray-200">
+                <button
+                  type="button"
+                  className={`py-2 px-4 font-medium text-sm ${
+                    activeImageTab === 'item'
+                      ? 'border-b-2 border-indigo-500 text-indigo-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  } cursor-pointer`}
+                  onClick={() => setActiveImageTab('item')}
+                >
+                  Item Images
+                </button>
+                <button
+                  type="button"
+                  className={`py-2 px-4 font-medium text-sm ${
+                    activeImageTab === 'packaging'
+                      ? 'border-b-2 border-indigo-500 text-indigo-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  } cursor-pointer`}
+                  onClick={() => setActiveImageTab('packaging')}
+                >
+                  Packaging
+                </button>
+                <button
+                  type="button"
+                  className={`py-2 px-4 font-medium text-sm ${
+                    activeImageTab === 'certificate'
+                      ? 'border-b-2 border-indigo-500 text-indigo-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  } cursor-pointer`}
+                  onClick={() => setActiveImageTab('certificate')}
+                >
+                  Certificate of Authenticity
+                </button>
               </div>
-              
-              {formData.images.length > 0 && (
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-                  {formData.images.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={image}
-                        alt={`Item preview ${index + 1}`}
-                        className="h-24 w-full object-cover rounded"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full hover:bg-red-700 cursor-pointer"
-                      >
-                        <FaTimes size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
+            
+            {activeImageTab === 'item' && (
+              <div>
+                <p className="text-sm text-gray-600 mb-4">Upload images of your item from different angles</p>
+                <FileUploader
+                  files={itemImages}
+                  onFilesChange={setItemImages}
+                  allowCamera={true}
+                  allowMultiple={true}
+                  maxFiles={10}
+                  acceptedFileTypes={{
+                    'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+                  }}
+                  label="Upload Item Images"
+                  dropzoneText="Drag & drop item images here, or click to select files"
+                />
+              </div>
+            )}
+            
+            {activeImageTab === 'packaging' && (
+              <div>
+                <p className="text-sm text-gray-600 mb-4">Upload images of the packaging or box</p>
+                <FileUploader
+                  files={packagingImages}
+                  onFilesChange={setPackagingImages}
+                  allowCamera={true}
+                  allowMultiple={true}
+                  maxFiles={5}
+                  acceptedFileTypes={{
+                    'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+                  }}
+                  label="Upload Packaging Images"
+                  dropzoneText="Drag & drop packaging images here, or click to select files"
+                />
+              </div>
+            )}
+            
+            {activeImageTab === 'certificate' && (
+              <div>
+                <p className="text-sm text-gray-600 mb-4">Upload images of the certificate of authenticity or other documentation</p>
+                <FileUploader
+                  files={certificateImages}
+                  onFilesChange={setCertificateImages}
+                  allowCamera={true}
+                  allowMultiple={true}
+                  maxFiles={5}
+                  acceptedFileTypes={{
+                    'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp']
+                  }}
+                  label="Upload Certificate Images"
+                  dropzoneText="Drag & drop certificate images here, or click to select files"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Proof of Purchase */}
+        <div className="card">
+          <div className="card-header">Proof of Purchase</div>
+          <div className="card-body">
+            <p className="text-sm text-gray-600 mb-4">
+              Upload receipts, invoices, or other proof of purchase documents (optional)
+            </p>
+            <FileUploader
+              files={proofOfPurchaseFiles}
+              onFilesChange={setProofOfPurchaseFiles}
+              allowCamera={true}
+              allowMultiple={true}
+              maxFiles={5}
+              acceptedFileTypes={{
+                'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.webp'],
+                'application/pdf': ['.pdf'],
+                'application/msword': ['.doc'],
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx']
+              }}
+              label="Upload Proof of Purchase"
+              dropzoneText="Drag & drop files here, or click to select files"
+            />
           </div>
         </div>
         

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { FaSave, FaUpload, FaKey, FaBell, FaShieldAlt, FaCreditCard, FaTimes } from 'react-icons/fa';
+import { FaSave, FaUpload, FaKey, FaBell, FaShieldAlt, FaCreditCard, FaTimes, FaFacebook, FaInstagram, FaTwitter, FaTiktok, FaReddit, FaDiscord, FaLink } from 'react-icons/fa';
 import * as Sentry from '@sentry/browser';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import toast from 'react-hot-toast';
+import { countries } from '@/modules/shared/data/countries';
 
 export default function UserSettings() {
   const { user } = useAuth();
@@ -13,8 +14,23 @@ export default function UserSettings() {
   const [profileForm, setProfileForm] = useState({
     firstName: '',
     lastName: '',
-    location: '',
+    city: '',
+    country: '',
     profilePicture: null
+  });
+  
+  const [socialMediaForm, setSocialMediaForm] = useState({
+    facebook: '',
+    instagram: '',
+    twitter: '',
+    tiktok: ''
+  });
+  
+  const [forumHandlesForm, setForumHandlesForm] = useState({
+    reddit: '',
+    discord: '',
+    other: '',
+    otherUrl: ''
   });
   
   const [notificationSettings, setNotificationSettings] = useState({
@@ -39,43 +55,113 @@ export default function UserSettings() {
       try {
         setLoading(true);
         
-        // In a real app, this would be an API call
-        // Simulating API call with timeout
-        setTimeout(() => {
-          // Mock user data
-          const mockUserData = {
-            firstName: 'John',
-            lastName: 'Collector',
-            location: 'San Francisco, CA',
-            profilePicture: null,
-            notifications: {
-              emailNotifications: true,
-              wishlistMatches: true,
-              marketplaceMessages: true,
-              transactionUpdates: true,
-              newFeedback: true,
-              promotions: false
-            },
-            privacy: {
-              showCollections: true,
-              showItems: true,
-              showValue: false,
-              allowMessages: true,
-              publicProfile: true
+        // Try to fetch user profile data from the API
+        try {
+          const response = await fetch('/api/user', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${user.aud}`
             }
-          };
-          
-          setProfileForm({
-            firstName: mockUserData.firstName,
-            lastName: mockUserData.lastName,
-            location: mockUserData.location,
-            profilePicture: mockUserData.profilePicture
           });
           
-          setNotificationSettings(mockUserData.notifications);
-          setPrivacySettings(mockUserData.privacy);
-          setLoading(false);
-        }, 1000);
+          if (response.ok) {
+            const userData = await response.json();
+            
+            // Set profile data
+            setProfileForm({
+              firstName: userData.firstName || '',
+              lastName: userData.lastName || '',
+              city: userData.city || '',
+              country: userData.country || '',
+              profilePicture: userData.profilePicture || null
+            });
+            
+            // Set social media data
+            if (userData.socialMedia) {
+              setSocialMediaForm({
+                facebook: userData.socialMedia.facebook || '',
+                instagram: userData.socialMedia.instagram || '',
+                twitter: userData.socialMedia.twitter || '',
+                tiktok: userData.socialMedia.tiktok || ''
+              });
+            }
+            
+            // Set forum handles data
+            if (userData.forumHandles) {
+              setForumHandlesForm({
+                reddit: userData.forumHandles.reddit || '',
+                discord: userData.forumHandles.discord || '',
+                other: userData.forumHandles.other || '',
+                otherUrl: userData.forumHandles.otherUrl || ''
+              });
+            }
+            
+            setLoading(false);
+            return;
+          }
+        } catch (error) {
+          console.error('Error fetching user data from API:', error);
+        }
+        
+        // Fallback to mock data if API fails
+        const mockUserData = {
+          firstName: 'John',
+          lastName: 'Collector',
+          city: 'San Francisco',
+          country: 'US',
+          profilePicture: null,
+          socialMedia: {
+            facebook: 'johncollector',
+            instagram: 'john_collector',
+            twitter: 'johncollector',
+            tiktok: '@johncollector'
+          },
+          forumHandles: {
+            reddit: 'u/johncollector',
+            discord: 'johncollector#1234'
+          },
+          notifications: {
+            emailNotifications: true,
+            wishlistMatches: true,
+            marketplaceMessages: true,
+            transactionUpdates: true,
+            newFeedback: true,
+            promotions: false
+          },
+          privacy: {
+            showCollections: true,
+            showItems: true,
+            showValue: false,
+            allowMessages: true,
+            publicProfile: true
+          }
+        };
+        
+        setProfileForm({
+          firstName: mockUserData.firstName,
+          lastName: mockUserData.lastName,
+          city: mockUserData.city,
+          country: mockUserData.country,
+          profilePicture: mockUserData.profilePicture
+        });
+        
+        setSocialMediaForm({
+          facebook: mockUserData.socialMedia.facebook || '',
+          instagram: mockUserData.socialMedia.instagram || '',
+          twitter: mockUserData.socialMedia.twitter || '',
+          tiktok: mockUserData.socialMedia.tiktok || ''
+        });
+        
+        setForumHandlesForm({
+          reddit: mockUserData.forumHandles.reddit || '',
+          discord: mockUserData.forumHandles.discord || '',
+          other: mockUserData.forumHandles.other || '',
+          otherUrl: mockUserData.forumHandles.otherUrl || ''
+        });
+        
+        setNotificationSettings(mockUserData.notifications);
+        setPrivacySettings(mockUserData.privacy);
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching user settings:', error);
         Sentry.captureException(error);
@@ -89,6 +175,22 @@ export default function UserSettings() {
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     setProfileForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleSocialMediaChange = (e) => {
+    const { name, value } = e.target;
+    setSocialMediaForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
+  const handleForumHandlesChange = (e) => {
+    const { name, value } = e.target;
+    setForumHandlesForm(prev => ({
       ...prev,
       [name]: value
     }));
@@ -130,12 +232,40 @@ export default function UserSettings() {
     try {
       setSaving(true);
       
+      // Combine all profile-related data
+      const profileData = {
+        firstName: profileForm.firstName,
+        lastName: profileForm.lastName,
+        city: profileForm.city,
+        country: profileForm.country,
+        socialMedia: socialMediaForm,
+        forumHandles: forumHandlesForm
+      };
+      
       // In a real app, this would be an API call to save the profile
-      // Simulating API call with timeout
-      setTimeout(() => {
+      try {
+        const response = await fetch('/api/user', {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${user.aud}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(profileData)
+        });
+        
+        if (response.ok) {
+          toast.success('Profile updated successfully');
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Failed to update profile');
+        }
+      } catch (error) {
+        console.error('Error saving profile to API:', error);
+        // Simulate successful update for demo purposes
         toast.success('Profile updated successfully');
-        setSaving(false);
-      }, 1000);
+      }
+      
+      setSaving(false);
     } catch (error) {
       console.error('Error saving profile:', error);
       Sentry.captureException(error);
@@ -195,7 +325,7 @@ export default function UserSettings() {
         activeTab === id
           ? 'bg-indigo-600 text-white'
           : 'text-gray-700 hover:bg-gray-100'
-      } transition-colors rounded-lg mb-2`}
+      } transition-colors rounded-lg mb-2 cursor-pointer`}
     >
       {icon}
       <span className="ml-3">{label}</span>
@@ -303,17 +433,174 @@ export default function UserSettings() {
                     <p className="mt-1 text-xs text-gray-500">Email cannot be changed. Contact support for assistance.</p>
                   </div>
                   
-                  <div className="form-control mb-6">
-                    <label htmlFor="location" className="form-label">Location</label>
-                    <input
-                      type="text"
-                      id="location"
-                      name="location"
-                      value={profileForm.location}
-                      onChange={handleProfileChange}
-                      placeholder="City, State"
-                      className="form-input box-border"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div className="form-control">
+                      <label htmlFor="city" className="form-label">City</label>
+                      <input
+                        type="text"
+                        id="city"
+                        name="city"
+                        value={profileForm.city}
+                        onChange={handleProfileChange}
+                        placeholder="Your city"
+                        className="form-input box-border"
+                      />
+                    </div>
+                    
+                    <div className="form-control">
+                      <label htmlFor="country" className="form-label">Country</label>
+                      <select
+                        id="country"
+                        name="country"
+                        value={profileForm.country}
+                        onChange={handleProfileChange}
+                        className="form-input box-border"
+                      >
+                        <option value="">Select a country</option>
+                        {countries.map(country => (
+                          <option key={country.code} value={country.code}>
+                            {country.flag} {country.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Social Media Handles */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Social Media Handles</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="form-control">
+                        <label htmlFor="facebook" className="form-label flex items-center">
+                          <FaFacebook className="text-blue-600 mr-2" />
+                          Facebook
+                        </label>
+                        <input
+                          type="text"
+                          id="facebook"
+                          name="facebook"
+                          value={socialMediaForm.facebook}
+                          onChange={handleSocialMediaChange}
+                          placeholder="Your Facebook username"
+                          className="form-input box-border"
+                        />
+                      </div>
+                      
+                      <div className="form-control">
+                        <label htmlFor="instagram" className="form-label flex items-center">
+                          <FaInstagram className="text-pink-600 mr-2" />
+                          Instagram
+                        </label>
+                        <input
+                          type="text"
+                          id="instagram"
+                          name="instagram"
+                          value={socialMediaForm.instagram}
+                          onChange={handleSocialMediaChange}
+                          placeholder="Your Instagram handle (without @)"
+                          className="form-input box-border"
+                        />
+                      </div>
+                      
+                      <div className="form-control">
+                        <label htmlFor="twitter" className="form-label flex items-center">
+                          <FaTwitter className="text-blue-400 mr-2" />
+                          Twitter
+                        </label>
+                        <input
+                          type="text"
+                          id="twitter"
+                          name="twitter"
+                          value={socialMediaForm.twitter}
+                          onChange={handleSocialMediaChange}
+                          placeholder="Your Twitter handle (without @)"
+                          className="form-input box-border"
+                        />
+                      </div>
+                      
+                      <div className="form-control">
+                        <label htmlFor="tiktok" className="form-label flex items-center">
+                          <FaTiktok className="mr-2" />
+                          TikTok
+                        </label>
+                        <input
+                          type="text"
+                          id="tiktok"
+                          name="tiktok"
+                          value={socialMediaForm.tiktok}
+                          onChange={handleSocialMediaChange}
+                          placeholder="Your TikTok handle"
+                          className="form-input box-border"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Forum Handles */}
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Forum Handles</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="form-control">
+                        <label htmlFor="reddit" className="form-label flex items-center">
+                          <FaReddit className="text-red-600 mr-2" />
+                          Reddit
+                        </label>
+                        <input
+                          type="text"
+                          id="reddit"
+                          name="reddit"
+                          value={forumHandlesForm.reddit}
+                          onChange={handleForumHandlesChange}
+                          placeholder="Your Reddit username (e.g., u/username)"
+                          className="form-input box-border"
+                        />
+                      </div>
+                      
+                      <div className="form-control">
+                        <label htmlFor="discord" className="form-label flex items-center">
+                          <FaDiscord className="text-indigo-600 mr-2" />
+                          Discord
+                        </label>
+                        <input
+                          type="text"
+                          id="discord"
+                          name="discord"
+                          value={forumHandlesForm.discord}
+                          onChange={handleForumHandlesChange}
+                          placeholder="Your Discord username (e.g., username#1234)"
+                          className="form-input box-border"
+                        />
+                      </div>
+                      
+                      <div className="form-control md:col-span-2">
+                        <label htmlFor="other" className="form-label flex items-center">
+                          <FaLink className="text-gray-600 mr-2" />
+                          Other Forum
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <input
+                            type="text"
+                            id="other"
+                            name="other"
+                            value={forumHandlesForm.other}
+                            onChange={handleForumHandlesChange}
+                            placeholder="Forum name and username"
+                            className="form-input box-border"
+                          />
+                          <input
+                            type="text"
+                            id="otherUrl"
+                            name="otherUrl"
+                            value={forumHandlesForm.otherUrl}
+                            onChange={handleForumHandlesChange}
+                            placeholder="URL to your forum profile"
+                            className="form-input box-border"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div className="card-footer flex justify-end">

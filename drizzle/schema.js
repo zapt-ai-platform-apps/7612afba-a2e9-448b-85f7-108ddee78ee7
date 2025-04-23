@@ -12,7 +12,12 @@ export const users = pgTable('users', {
   profilePicture: text('profile_picture'),
   location: text('location'),
   averageRating: decimal('average_rating', { precision: 3, scale: 2 }),
-  ratingCount: integer('rating_count').default(0)
+  ratingCount: integer('rating_count').default(0),
+  // New fields for enhanced user profiles
+  country: text('country'),
+  city: text('city'),
+  socialMedia: jsonb('social_media').default('{}'),
+  forumHandles: jsonb('forum_handles').default('{}')
 });
 
 // Collection Types table (templates for different collectibles)
@@ -59,7 +64,10 @@ export const items = pgTable('items', {
   forSale: boolean('for_sale').default(false),
   askingPrice: decimal('asking_price', { precision: 12, scale: 2 }),
   createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow()
+  updatedAt: timestamp('updated_at').defaultNow(),
+  // New fields
+  currency: text('currency').default('USD'),
+  proofOfPurchase: jsonb('proof_of_purchase').default('[]') // Array of proof of purchase files
 });
 
 // Wishlist items
@@ -73,7 +81,9 @@ export const wishlistItems = pgTable('wishlist_items', {
   attributes: jsonb('attributes'), // Desired attributes
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-  notificationsEnabled: boolean('notifications_enabled').default(true)
+  notificationsEnabled: boolean('notifications_enabled').default(true),
+  // New field
+  currency: text('currency').default('USD')
 });
 
 // Wishlist matches (matches between wishlist items and available items)

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaEdit, FaEnvelope, FaMapMarkerAlt, FaStar } from 'react-icons/fa';
+import { FaEdit, FaEnvelope, FaMapMarkerAlt, FaStar, FaFacebook, FaInstagram, FaTwitter, FaTiktok, FaReddit, FaDiscord, FaLink } from 'react-icons/fa';
 import * as Sentry from '@sentry/browser';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import toast from 'react-hot-toast';
@@ -17,51 +17,106 @@ export default function UserProfilePage() {
       try {
         setLoading(true);
         
-        // In a real app, this would be an API call
-        // Simulating API call with timeout
-        setTimeout(() => {
-          // Mock profile data
-          const mockProfile = {
+        // In a real implementation, this would fetch from the API
+        // Simulating API call for now
+        console.log('Fetching profile data for user:', user?.email);
+        
+        // Fetch user profile 
+        let userProfile;
+        try {
+          const response = await fetch('/api/user', {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${user.aud}`
+            }
+          });
+          
+          if (response.ok) {
+            userProfile = await response.json();
+          } else {
+            // Fallback to mock data if API fails
+            userProfile = {
+              id: user.id,
+              email: user.email,
+              firstName: 'John',
+              lastName: 'Collector',
+              location: 'San Francisco, CA',
+              city: 'San Francisco',
+              country: 'US',
+              profilePicture: null,
+              averageRating: 4.8,
+              ratingCount: 15,
+              totalCollections: 5,
+              totalItems: 145,
+              memberSince: new Date(2022, 0, 15).toISOString(),
+              socialMedia: {
+                facebook: 'johncollector',
+                instagram: 'john_collector',
+                twitter: 'johncollector',
+                tiktok: '@johncollector'
+              },
+              forumHandles: {
+                reddit: 'u/johncollector',
+                discord: 'johncollector#1234'
+              }
+            };
+          }
+        } catch (error) {
+          console.error('Error fetching user profile data:', error);
+          // Fallback to mock data
+          userProfile = {
             id: user.id,
             email: user.email,
             firstName: 'John',
             lastName: 'Collector',
             location: 'San Francisco, CA',
+            city: 'San Francisco',
+            country: 'US',
             profilePicture: null,
             averageRating: 4.8,
             ratingCount: 15,
             totalCollections: 5,
             totalItems: 145,
-            memberSince: new Date(2022, 0, 15).toISOString()
+            memberSince: new Date(2022, 0, 15).toISOString(),
+            socialMedia: {
+              facebook: 'johncollector',
+              instagram: 'john_collector',
+              twitter: 'johncollector',
+              tiktok: '@johncollector'
+            },
+            forumHandles: {
+              reddit: 'u/johncollector',
+              discord: 'johncollector#1234'
+            }
           };
-          
-          // Mock collections data
-          const mockCollections = [
-            { id: '1', name: 'Model Cars', itemCount: 12, totalValue: 1575.00, coverImage: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22300%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_17a6e06bd75%20text%20%7B%20fill%3A%23AAAAAA%3Bfont-weight%3Abold%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A15pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_17a6e06bd75%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23EEEEEE%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%22107.0%22%3EModel Cars%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E' },
-            { id: '2', name: 'Pokemon Cards', itemCount: 78, totalValue: 12460.00, coverImage: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22300%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_17a6e06bd75%20text%20%7B%20fill%3A%23AAAAAA%3Bfont-weight%3Abold%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A15pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_17a6e06bd75%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23EEEEEE%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%22107.0%22%3EPokemon Cards%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E' },
-            { id: '3', name: 'LEGO Sets', itemCount: 8, totalValue: 3250.00, coverImage: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22300%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_17a6e06bd75%20text%20%7B%20fill%3A%23AAAAAA%3Bfont-weight%3Abold%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A15pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_17a6e06bd75%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23EEEEEE%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%22107.0%22%3ELEGO Sets%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E' }
-          ];
-          
-          // Mock feedback
-          const mockFeedback = [
-            { id: '1', fromUser: { name: 'Alice Smith' }, rating: 5, comment: 'Great collector, fast payment and excellent communication!', createdAt: new Date(2023, 4, 15).toISOString() },
-            { id: '2', fromUser: { name: 'Bob Johnson' }, rating: 5, comment: 'Smooth transaction, item was exactly as described.', createdAt: new Date(2023, 3, 22).toISOString() },
-            { id: '3', fromUser: { name: 'Carol Williams' }, rating: 4, comment: 'Good experience overall, would trade with again.', createdAt: new Date(2023, 2, 10).toISOString() }
-          ];
-          
-          // Mock transactions
-          const mockTransactions = [
-            { id: '1', type: 'purchase', item: { name: 'Charizard Holo 1st Edition' }, otherParty: { name: 'PokeMaster' }, amount: 8500.00, status: 'completed', createdAt: new Date(2023, 5, 10).toISOString() },
-            { id: '2', type: 'sale', item: { name: '1965 Shelby Cobra 427 S/C' }, otherParty: { name: 'CarCollector42' }, amount: 175.00, status: 'completed', createdAt: new Date(2023, 4, 5).toISOString() },
-            { id: '3', type: 'purchase', item: { name: 'LEGO Star Wars Millennium Falcon UCS' }, otherParty: { name: 'BrickFanatic' }, amount: 899.99, status: 'pending', createdAt: new Date(2023, 5, 25).toISOString() }
-          ];
-          
-          setProfile(mockProfile);
-          setCollections(mockCollections);
-          setFeedback(mockFeedback);
-          setTransactions(mockTransactions);
-          setLoading(false);
-        }, 1000);
+        }
+        
+        // Mock collections data
+        const mockCollections = [
+          { id: '1', name: 'Model Cars', itemCount: 12, totalValue: 1575.00, coverImage: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22300%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_17a6e06bd75%20text%20%7B%20fill%3A%23AAAAAA%3Bfont-weight%3Abold%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A15pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_17a6e06bd75%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23EEEEEE%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%22107.0%22%3EModel Cars%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E' },
+          { id: '2', name: 'Pokemon Cards', itemCount: 78, totalValue: 12460.00, coverImage: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22300%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_17a6e06bd75%20text%20%7B%20fill%3A%23AAAAAA%3Bfont-weight%3Abold%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A15pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_17a6e06bd75%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23EEEEEE%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%22107.0%22%3EPokemon Cards%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E' },
+          { id: '3', name: 'LEGO Sets', itemCount: 8, totalValue: 3250.00, coverImage: 'data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%22300%22%20height%3D%22200%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20300%20200%22%20preserveAspectRatio%3D%22none%22%3E%3Cdefs%3E%3Cstyle%20type%3D%22text%2Fcss%22%3E%23holder_17a6e06bd75%20text%20%7B%20fill%3A%23AAAAAA%3Bfont-weight%3Abold%3Bfont-family%3AArial%2C%20Helvetica%2C%20Open%20Sans%2C%20sans-serif%2C%20monospace%3Bfont-size%3A15pt%20%7D%20%3C%2Fstyle%3E%3C%2Fdefs%3E%3Cg%20id%3D%22holder_17a6e06bd75%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23EEEEEE%22%3E%3C%2Frect%3E%3Cg%3E%3Ctext%20x%3D%22107.1875%22%20y%3D%22107.0%22%3ELEGO Sets%3C%2Ftext%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E' }
+        ];
+        
+        // Mock feedback
+        const mockFeedback = [
+          { id: '1', fromUser: { name: 'Alice Smith' }, rating: 5, comment: 'Great collector, fast payment and excellent communication!', createdAt: new Date(2023, 4, 15).toISOString() },
+          { id: '2', fromUser: { name: 'Bob Johnson' }, rating: 5, comment: 'Smooth transaction, item was exactly as described.', createdAt: new Date(2023, 3, 22).toISOString() },
+          { id: '3', fromUser: { name: 'Carol Williams' }, rating: 4, comment: 'Good experience overall, would trade with again.', createdAt: new Date(2023, 2, 10).toISOString() }
+        ];
+        
+        // Mock transactions
+        const mockTransactions = [
+          { id: '1', type: 'purchase', item: { name: 'Charizard Holo 1st Edition' }, otherParty: { name: 'PokeMaster' }, amount: 8500.00, status: 'completed', createdAt: new Date(2023, 5, 10).toISOString() },
+          { id: '2', type: 'sale', item: { name: '1965 Shelby Cobra 427 S/C' }, otherParty: { name: 'CarCollector42' }, amount: 175.00, status: 'completed', createdAt: new Date(2023, 4, 5).toISOString() },
+          { id: '3', type: 'purchase', item: { name: 'LEGO Star Wars Millennium Falcon UCS' }, otherParty: { name: 'BrickFanatic' }, amount: 899.99, status: 'pending', createdAt: new Date(2023, 5, 25).toISOString() }
+        ];
+        
+        setProfile(userProfile);
+        setCollections(mockCollections);
+        setFeedback(mockFeedback);
+        setTransactions(mockTransactions);
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching user data:', error);
         Sentry.captureException(error);
@@ -71,6 +126,153 @@ export default function UserProfilePage() {
     
     fetchUserData();
   }, [user]);
+  
+  const getCountryFlag = (countryCode) => {
+    if (!countryCode) return '';
+    
+    // Simple mapping of country code to flag emoji
+    // This uses the fact that flag emojis are made of regional indicator symbols
+    const codePoints = countryCode
+      .toUpperCase()
+      .split('')
+      .map(char => 127397 + char.charCodeAt(0));
+      
+    return String.fromCodePoint(...codePoints);
+  };
+  
+  const getSocialMediaLink = (platform, handle) => {
+    if (!handle) return '#';
+    
+    switch (platform) {
+      case 'facebook':
+        return `https://facebook.com/${handle}`;
+      case 'instagram':
+        return `https://instagram.com/${handle.replace('@', '')}`;
+      case 'twitter':
+        return `https://twitter.com/${handle.replace('@', '')}`;
+      case 'tiktok':
+        return `https://tiktok.com/@${handle.replace('@', '')}`;
+      default:
+        return '#';
+    }
+  };
+  
+  const getForumLink = (platform, handle) => {
+    if (!handle) return '#';
+    
+    switch (platform) {
+      case 'reddit':
+        return `https://reddit.com/${handle}`;
+      case 'discord':
+        return `https://discord.com/users/${handle}`;
+      default:
+        return '#';
+    }
+  };
+  
+  const renderSocialMediaLinks = () => {
+    if (!profile.socialMedia || Object.keys(profile.socialMedia).length === 0) {
+      return <div className="text-sm text-gray-500">No social media profiles added</div>;
+    }
+    
+    return (
+      <div className="flex flex-wrap gap-3">
+        {profile.socialMedia.facebook && (
+          <a 
+            href={getSocialMediaLink('facebook', profile.socialMedia.facebook)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-blue-600 hover:text-blue-800"
+          >
+            <FaFacebook className="mr-1" />
+            <span className="text-sm">{profile.socialMedia.facebook}</span>
+          </a>
+        )}
+        
+        {profile.socialMedia.instagram && (
+          <a 
+            href={getSocialMediaLink('instagram', profile.socialMedia.instagram)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-pink-600 hover:text-pink-800"
+          >
+            <FaInstagram className="mr-1" />
+            <span className="text-sm">{profile.socialMedia.instagram}</span>
+          </a>
+        )}
+        
+        {profile.socialMedia.twitter && (
+          <a 
+            href={getSocialMediaLink('twitter', profile.socialMedia.twitter)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-blue-400 hover:text-blue-600"
+          >
+            <FaTwitter className="mr-1" />
+            <span className="text-sm">{profile.socialMedia.twitter}</span>
+          </a>
+        )}
+        
+        {profile.socialMedia.tiktok && (
+          <a 
+            href={getSocialMediaLink('tiktok', profile.socialMedia.tiktok)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-black hover:text-gray-700"
+          >
+            <FaTiktok className="mr-1" />
+            <span className="text-sm">{profile.socialMedia.tiktok}</span>
+          </a>
+        )}
+      </div>
+    );
+  };
+  
+  const renderForumHandles = () => {
+    if (!profile.forumHandles || Object.keys(profile.forumHandles).length === 0) {
+      return <div className="text-sm text-gray-500">No forum profiles added</div>;
+    }
+    
+    return (
+      <div className="flex flex-wrap gap-3">
+        {profile.forumHandles.reddit && (
+          <a 
+            href={getForumLink('reddit', profile.forumHandles.reddit)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-red-600 hover:text-red-800"
+          >
+            <FaReddit className="mr-1" />
+            <span className="text-sm">{profile.forumHandles.reddit}</span>
+          </a>
+        )}
+        
+        {profile.forumHandles.discord && (
+          <a 
+            href={getForumLink('discord', profile.forumHandles.discord)} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-indigo-600 hover:text-indigo-800"
+          >
+            <FaDiscord className="mr-1" />
+            <span className="text-sm">{profile.forumHandles.discord}</span>
+          </a>
+        )}
+        
+        {profile.forumHandles.other && (
+          <a 
+            href={profile.forumHandles.otherUrl || '#'} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center text-gray-600 hover:text-gray-800"
+          >
+            <FaLink className="mr-1" />
+            <span className="text-sm">{profile.forumHandles.other}</span>
+          </a>
+        )}
+      </div>
+    );
+  };
   
   if (loading) {
     return (
@@ -114,10 +316,13 @@ export default function UserProfilePage() {
                       <span>{profile.email}</span>
                     </div>
                     
-                    {profile.location && (
+                    {(profile.city || profile.country) && (
                       <div className="flex items-center justify-center md:justify-start">
                         <FaMapMarkerAlt className="mr-1 text-gray-400" />
-                        <span>{profile.location}</span>
+                        <span>
+                          {profile.city && profile.country ? `${profile.city}, ` : profile.city}
+                          {profile.country && getCountryFlag(profile.country)} {profile.country}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -136,21 +341,34 @@ export default function UserProfilePage() {
               
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">{profile.totalCollections}</div>
+                  <div className="text-2xl font-bold text-gray-900">{collections.length}</div>
                   <div className="text-sm text-gray-600">Collections</div>
                 </div>
                 
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-gray-900">{profile.totalItems}</div>
+                  <div className="text-2xl font-bold text-gray-900">{collections.reduce((sum, collection) => sum + collection.itemCount, 0)}</div>
                   <div className="text-sm text-gray-600">Items</div>
                 </div>
                 
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
                   <div className="flex items-center justify-center">
-                    <span className="text-2xl font-bold text-gray-900 mr-1">{profile.averageRating.toFixed(1)}</span>
+                    <span className="text-2xl font-bold text-gray-900 mr-1">{profile.averageRating?.toFixed(1) || "0.0"}</span>
                     <FaStar className="text-yellow-500" />
                   </div>
-                  <div className="text-sm text-gray-600">{profile.ratingCount} Ratings</div>
+                  <div className="text-sm text-gray-600">{profile.ratingCount || 0} Ratings</div>
+                </div>
+              </div>
+              
+              {/* Social Media and Forums */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Social Media</h3>
+                  {renderSocialMediaLinks()}
+                </div>
+                
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Forum Handles</h3>
+                  {renderForumHandles()}
                 </div>
               </div>
             </div>
