@@ -43,7 +43,7 @@ const mockDownloadCsv = vi.fn();
 const mockViewJsonInBrowser = vi.fn();
 
 // Manually mock the reportHelpers functions
-vi.mock('../utils/reportHelpers', () => ({
+vi.mock('@/modules/reports/utils/reportHelpers', () => ({
   downloadPdf: (htmlContent, fileName) => mockDownloadPdf(htmlContent, fileName),
   downloadCsv: (csvContent, fileName) => mockDownloadCsv(csvContent, fileName),
   viewJsonInBrowser: (data) => mockViewJsonInBrowser(data)
