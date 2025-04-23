@@ -131,3 +131,14 @@ export function del(url) {
     method: 'DELETE',
   });
 }
+
+/**
+ * API client with HTTP method wrappers
+ */
+export const api = {
+  get,
+  post,
+  put,
+  patch,
+  delete: del // 'delete' is a reserved keyword, so we use 'del' internally
+};
