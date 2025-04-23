@@ -1,67 +1,76 @@
-import { useState, useEffect, useRef, useContext } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase, recordLogin } from '@/supabaseClient';
-import * as Sentry from '@sentry/browser';
 import { eventBus } from '@/modules/core/utils/eventBus';
-import { AuthContext } from '../context/AuthContext';
-
-// Event names for authentication events
-export const AUTH_EVENTS = {
-  USER_SIGNED_IN: 'auth:user_signed_in',
-  USER_SIGNED_OUT: 'auth:user_signed_out',
-  SESSION_REFRESHED: 'auth:session_refreshed',
-};
+import { events } from '../utils/events';
+import * as Sentry from '@sentry/browser';
+import * as authServices from '../internal/services';
 
 export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
-
-export function useAuthProvider() {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [hasRecordedLogin, setHasRecordedLogin] = useState(false);
   const hasSessionRef = useRef(false);
   
-  // Use this function to safely update session and user state
-  const updateSession = (newSession) => {
-    console.log('Updating session state:', newSession ? 'Session Present' : 'No Session');
+  // Use this function to update session so we also update our ref
+  const updateSession = useCallback((newSession) => {
     setSession(newSession);
-    setUser(newSession?.user || null);
     hasSessionRef.current = newSession !== null;
-  };
+  }, []);
   
+  // Fetch user profile
+  const fetchUserProfile = useCallback(async () => {
+    if (!session) return;
+    
+    try {
+      setError(null);
+      const { data, error } = await authServices.getUserProfile();
+      
+      if (error) {
+        console.warn('Error fetching user profile:', error);
+        // Don't set an error state here, just log it
+        // The user might not have a profile yet which is fine
+      }
+      
+      if (data) {
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user profile:', err);
+      Sentry.captureException(err, {
+        extra: { context: 'useAuth.fetchUserProfile' }
+      });
+      // Don't set error state here either
+    }
+  }, [session]);
+  
+  // Setup auth state change listener
   useEffect(() => {
-    // Check active session on initial mount
     const checkSession = async () => {
       try {
-        console.log('Checking initial session');
         const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Error checking session:', error);
-          Sentry.captureException(error, {
-            extra: { context: 'Initial session check' }
-          });
-          throw error;
-        }
+        if (error) throw error;
         
         // Set initial session
         updateSession(data.session);
         if (data.session) {
+          setUser(data.session.user);
           hasSessionRef.current = true;
-          console.log('Initial session found');
-        } else {
-          console.log('No initial session found');
+        }
+        
+        // Fetch user profile if we have a session
+        if (data.session) {
+          await fetchUserProfile();
         }
         
         setLoading(false);
       } catch (error) {
-        console.error('Error in checkSession:', error);
-        Sentry.captureException(error);
+        console.error('Error checking session:', error);
+        Sentry.captureException(error, {
+          extra: { context: 'useAuth.checkSession' }
+        });
         setLoading(false);
       }
     };
@@ -72,85 +81,102 @@ export function useAuthProvider() {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       console.log('Auth event:', event, 'Has session:', hasSessionRef.current);
       
-      try {
-        // For SIGNED_IN, only update session if we don't have one
-        if (event === 'SIGNED_IN') {
-          if (!hasSessionRef.current) {
-            console.log('SIGNED_IN event - updating session');
-            updateSession(newSession);
-            if (newSession?.user?.email) {
-              eventBus.publish(AUTH_EVENTS.USER_SIGNED_IN, { user: newSession.user });
-              setHasRecordedLogin(false);
-            }
-          } else {
-            console.log('Already have session, ignoring SIGNED_IN event');
-          }
-        }
-        // For TOKEN_REFRESHED, always update the session
-        else if (event === 'TOKEN_REFRESHED') {
-          console.log('TOKEN_REFRESHED event - updating session');
+      // For SIGNED_IN, only update session if we don't have one
+      if (event === 'SIGNED_IN') {
+        if (!hasSessionRef.current) {
           updateSession(newSession);
-          eventBus.publish(AUTH_EVENTS.SESSION_REFRESHED, { session: newSession });
+          setUser(newSession?.user || null);
+          if (newSession?.user?.email) {
+            eventBus.publish(events.USER_SIGNED_IN, { user: newSession.user });
+            setHasRecordedLogin(false);
+          }
+          
+          // Fetch user profile after sign in
+          await fetchUserProfile();
+        } else {
+          console.log('Already have session, ignoring SIGNED_IN event');
         }
-        // For SIGNED_OUT, clear the session
-        else if (event === 'SIGNED_OUT') {
-          console.log('SIGNED_OUT event - clearing session');
-          updateSession(null);
-          eventBus.publish(AUTH_EVENTS.USER_SIGNED_OUT, {});
-          setHasRecordedLogin(false);
-        }
-      } catch (error) {
-        console.error('Error handling auth state change:', error);
-        Sentry.captureException(error, {
-          extra: { context: 'Auth state change handler', authEvent: event }
-        });
+      }
+      // For TOKEN_REFRESHED, always update the session
+      else if (event === 'TOKEN_REFRESHED') {
+        updateSession(newSession);
+        setUser(newSession?.user || null);
+      }
+      // For SIGNED_OUT, clear the session
+      else if (event === 'SIGNED_OUT') {
+        updateSession(null);
+        setUser(null);
+        setProfile(null);
+        eventBus.publish(events.USER_SIGNED_OUT, {});
+        setHasRecordedLogin(false);
       }
     });
     
     return () => {
-      console.log('Cleaning up auth listener');
-      authListener?.subscription?.unsubscribe();
+      authListener?.subscription.unsubscribe();
     };
-  }, []); // No dependencies to prevent re-creating the listener
+  }, [updateSession, fetchUserProfile]);
   
-  // Record login when session exists and hasn't been recorded yet
+  // Record login when session changes
   useEffect(() => {
     if (session?.user?.email && !hasRecordedLogin) {
-      console.log('Recording login for user:', session.user.email);
-      try {
-        recordLogin(session.user.email, import.meta.env.VITE_PUBLIC_APP_ENV);
-        setHasRecordedLogin(true);
-      } catch (error) {
-        console.error('Failed to record login:', error);
-        Sentry.captureException(error, {
-          extra: { context: 'Record login' }
+      recordLogin(session.user.email, import.meta.env.VITE_PUBLIC_APP_ENV)
+        .then(() => setHasRecordedLogin(true))
+        .catch((error) => {
+          console.error('Failed to record login:', error);
+          Sentry.captureException(error, {
+            extra: { context: 'useAuth.recordLogin' }
+          });
         });
-      }
     }
   }, [session, hasRecordedLogin]);
   
-  const signOut = async () => {
+  // Update user profile
+  const updateProfile = useCallback(async (profileData) => {
     try {
-      console.log('Signing out user');
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Error signing out:', error);
-        Sentry.captureException(error, {
-          extra: { context: 'Sign out' }
-        });
-        throw error;
-      }
-    } catch (error) {
-      console.error('Error in signOut function:', error);
-      Sentry.captureException(error);
-      throw error;
+      setError(null);
+      const { data, error } = await authServices.updateUserProfile(profileData);
+      
+      if (error) throw error;
+      
+      setProfile(data);
+      return { data, error: null };
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      Sentry.captureException(err, {
+        extra: { context: 'useAuth.updateProfile', profileData }
+      });
+      setError(err.message);
+      return { data: null, error: err };
     }
-  };
+  }, []);
+  
+  // Sign out
+  const signOut = useCallback(async () => {
+    try {
+      setError(null);
+      const { error } = await authServices.signOut();
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error signing out:', err);
+      Sentry.captureException(err, {
+        extra: { context: 'useAuth.signOut' }
+      });
+      setError(err.message);
+    }
+  }, []);
   
   return {
     session,
     user,
+    profile,
     loading,
+    error,
+    setError,
     signOut,
+    updateProfile,
+    refreshProfile: fetchUserProfile,
   };
 }
+
+export default useAuth;

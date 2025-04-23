@@ -13,12 +13,52 @@ export default asyncHandler(async (req, res) => {
         // Get user profile
         const result = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
         
+        // If user doesn't exist in our database, create a new user record
         if (result.length === 0) {
-          return sendError(res, 404, 'User not found');
+          console.log(`User ${user.id} not found in database, creating new record`);
+          
+          // Create the user record
+          const newUser = {
+            id: user.id,
+            email: user.email,
+            firstName: user.user_metadata?.first_name || '',
+            lastName: user.user_metadata?.last_name || '',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          const insertResult = await db.insert(users).values(newUser).returning();
+          
+          if (insertResult.length === 0) {
+            return sendError(res, 500, 'Failed to create user record');
+          }
+          
+          console.log(`Successfully created user record for ${user.id}`);
+          return res.status(200).json(insertResult[0]);
         }
         
         return res.status(200).json(result[0]);
       } else if (req.method === 'PATCH') {
+        // Check if user exists first
+        const existingUser = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+        
+        // If user doesn't exist, create it before updating
+        if (existingUser.length === 0) {
+          console.log(`User ${user.id} not found for update, creating new record first`);
+          
+          // Create the user record
+          const newUser = {
+            id: user.id,
+            email: user.email,
+            firstName: user.user_metadata?.first_name || '',
+            lastName: user.user_metadata?.last_name || '',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          await db.insert(users).values(newUser);
+        }
+        
         // Update user profile
         const { firstName, lastName, city, country, socialMedia, forumHandles, ...otherFields } = req.body;
         
@@ -51,7 +91,7 @@ export default asyncHandler(async (req, res) => {
           .returning();
         
         if (result.length === 0) {
-          return sendError(res, 404, 'User not found');
+          return sendError(res, 500, 'Failed to update user record');
         }
         
         return res.status(200).json(result[0]);
@@ -63,7 +103,13 @@ export default asyncHandler(async (req, res) => {
     }
   } catch (error) {
     console.error('Error in user API:', error);
-    Sentry.captureException(error);
+    Sentry.captureException(error, {
+      extra: {
+        endpoint: 'user',
+        method: req.method,
+        user: req.user ? { id: req.user.id } : 'not authenticated'
+      }
+    });
     return sendError(res, 500, 'Internal server error');
   }
 });
