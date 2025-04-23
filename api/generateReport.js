@@ -220,8 +220,7 @@ export default asyncHandler(async (req, res) => {
         res.setHeader('Content-Disposition', `attachment; filename=${collection.name}-${reportType}-report.csv`);
         return res.status(200).send(csvContent);
       } else if (format === 'pdf') {
-        // For simplicity, we'll create a basic HTML representation of the data
-        // that can be converted to PDF
+        // For PDF, we'll create HTML content
         let htmlContent = `
           <html>
           <head>
@@ -334,20 +333,29 @@ export default asyncHandler(async (req, res) => {
           </html>
         `;
         
-        // For this demonstration, we'll just return the HTML
-        // In a real implementation, we would use a library like html-pdf to convert this to a PDF
-        reportData.htmlContent = htmlContent;
-        reportData.format = 'pdf';
+        // Return HTML content for PDF rendering on the client side
+        res.setHeader('Content-Type', 'application/json');
+        return res.status(200).json({
+          success: true,
+          message: 'Report generated successfully',
+          report: {
+            format: 'pdf',
+            htmlContent,
+            collectionName: collection.name,
+            reportType
+          }
+        });
       } else {
         // Default: JSON format
-        reportData.format = 'json';
+        return res.status(200).json({
+          success: true,
+          message: 'Report generated successfully',
+          report: {
+            format: 'json',
+            ...reportData
+          }
+        });
       }
-      
-      return res.status(200).json({
-        success: true,
-        message: 'Report generated successfully',
-        report: reportData
-      });
     } finally {
       await client.end();
     }

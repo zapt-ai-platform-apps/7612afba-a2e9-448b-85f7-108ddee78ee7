@@ -3,6 +3,8 @@ import { FaFileAlt, FaFileInvoiceDollar, FaFileExport, FaFilePdf, FaCopy } from 
 import * as Sentry from '@sentry/browser';
 import { useAuth } from '@/modules/auth/hooks/useAuth';
 import toast from 'react-hot-toast';
+import { collectionsApi } from '@/modules/collections/api';
+import html2pdf from 'html2pdf.js';
 
 export default function ReportsPage() {
   const { user } = useAuth();
@@ -12,32 +14,34 @@ export default function ReportsPage() {
   const [reportType, setReportType] = useState('inventory');
   const [isGenerating, setIsGenerating] = useState(false);
   
+  // Report options
+  const [includeImages, setIncludeImages] = useState(false);
+  const [includeDescription, setIncludeDescription] = useState(true);
+  const [includeAttributes, setIncludeAttributes] = useState(true);
+  const [includePurchaseInfo, setIncludePurchaseInfo] = useState(true);
+  const [showValueChange, setShowValueChange] = useState(true);
+  const [outputFormat, setOutputFormat] = useState('pdf');
+  
   useEffect(() => {
     const fetchCollections = async () => {
       try {
         setLoading(true);
         
-        // In a real app, this would be an API call
-        // Simulating API call with timeout
-        setTimeout(() => {
-          const mockCollections = [
-            { id: '1', name: 'Model Cars', itemCount: 12, totalValue: 1575.00 },
-            { id: '2', name: 'Pokemon Cards', itemCount: 78, totalValue: 12460.00 },
-            { id: '3', name: 'LEGO Sets', itemCount: 8, totalValue: 3250.00 },
-            { id: '4', name: 'Rare Coins', itemCount: 42, totalValue: 8750.00 },
-            { id: '5', name: 'Postage Stamps', itemCount: 156, totalValue: 4200.00 }
-          ];
+        const response = await collectionsApi.getCollections();
+        
+        if (response.data) {
+          setCollections(response.data);
           
-          setCollections(mockCollections);
-          setLoading(false);
-          
-          if (mockCollections.length > 0) {
-            setSelectedCollection(mockCollections[0].id);
+          if (response.data.length > 0) {
+            setSelectedCollection(response.data[0].id);
           }
-        }, 1000);
+        }
+        
+        setLoading(false);
       } catch (error) {
         console.error('Error fetching collections:', error);
         Sentry.captureException(error);
+        toast.error('Failed to fetch collections');
         setLoading(false);
       }
     };
@@ -53,20 +57,99 @@ export default function ReportsPage() {
     setSelectedCollection(e.target.value);
   };
   
+  const handleOutputFormatChange = (format) => {
+    setOutputFormat(format);
+  };
+  
+  const downloadPdf = (htmlContent, fileName) => {
+    const options = {
+      margin: 10,
+      filename: fileName,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    
+    // Create a temporary div to render the HTML
+    const element = document.createElement('div');
+    element.innerHTML = htmlContent;
+    element.style.position = 'absolute';
+    element.style.left = '-9999px';
+    document.body.appendChild(element);
+    
+    // Generate and download the PDF
+    html2pdf().from(element).set(options).save().then(() => {
+      // Clean up
+      document.body.removeChild(element);
+    });
+  };
+  
+  const downloadCsv = (csvContent, fileName) => {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    
+    // Create a download link and trigger it
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', fileName);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
   const handleGenerateReport = async () => {
     try {
+      if (!selectedCollection) {
+        toast.error('Please select a collection');
+        return;
+      }
+      
       setIsGenerating(true);
       
-      // In a real app, this would generate a real report
-      // Here we'll just simulate it with a timeout
-      setTimeout(() => {
+      const reportData = {
+        collectionId: selectedCollection,
+        reportType: reportType,
+        format: outputFormat,
+        includeImages: includeImages,
+        includeDescription: includeDescription,
+        includeAttributes: includeAttributes,
+        includePurchaseInfo: includePurchaseInfo,
+        showValueChange: showValueChange
+      };
+      
+      console.log('Generating report with data:', reportData);
+      
+      const response = await collectionsApi.generateReport(reportData);
+      
+      if (response.success) {
         toast.success('Report generated successfully!');
-        setIsGenerating(false);
-      }, 2000);
+        
+        const collection = collections.find(c => c.id === selectedCollection);
+        const fileName = `${collection?.name || 'Collection'}-${reportType}-report`;
+        
+        // Handle different formats
+        if (response.report.format === 'pdf' && response.report.htmlContent) {
+          downloadPdf(response.report.htmlContent, `${fileName}.pdf`);
+        } else if (outputFormat === 'csv' && response instanceof Blob) {
+          // For CSV, response is handled directly as a blob
+          downloadCsv(await response.text(), `${fileName}.csv`);
+        } else {
+          // For JSON format or online view, we can display in a new tab
+          const dataStr = JSON.stringify(response.report, null, 2);
+          const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+          
+          // Open in a new tab
+          window.open(dataUri, '_blank');
+        }
+      } else {
+        toast.error(response.error || 'Failed to generate report');
+      }
     } catch (error) {
       console.error('Error generating report:', error);
       Sentry.captureException(error);
       toast.error('Failed to generate report');
+    } finally {
       setIsGenerating(false);
     }
   };
@@ -172,7 +255,8 @@ export default function ReportsPage() {
                 >
                   {collections.map(collection => (
                     <option key={collection.id} value={collection.id}>
-                      {collection.name} ({collection.itemCount} items, ${collection.totalValue.toLocaleString()})
+                      {collection.name} ({collection.itemCount || 0} items, $
+                      {collection.totalValue ? collection.totalValue.toLocaleString() : '0'})
                     </option>
                   ))}
                 </select>
@@ -184,6 +268,8 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="includeImages"
+                      checked={includeImages}
+                      onChange={(e) => setIncludeImages(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <label htmlFor="includeImages" className="ml-2 text-sm text-gray-700">
@@ -195,6 +281,8 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="includeDescription"
+                      checked={includeDescription}
+                      onChange={(e) => setIncludeDescription(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
                     />
                     <label htmlFor="includeDescription" className="ml-2 text-sm text-gray-700">
@@ -206,8 +294,9 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="includeAttributes"
+                      checked={includeAttributes}
+                      onChange={(e) => setIncludeAttributes(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      defaultChecked
                     />
                     <label htmlFor="includeAttributes" className="ml-2 text-sm text-gray-700">
                       Include attributes
@@ -222,8 +311,9 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="includePurchaseInfo"
+                      checked={includePurchaseInfo}
+                      onChange={(e) => setIncludePurchaseInfo(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      defaultChecked
                     />
                     <label htmlFor="includePurchaseInfo" className="ml-2 text-sm text-gray-700">
                       Include purchase information
@@ -234,8 +324,9 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="showValueChange"
+                      checked={showValueChange}
+                      onChange={(e) => setShowValueChange(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      defaultChecked
                     />
                     <label htmlFor="showValueChange" className="ml-2 text-sm text-gray-700">
                       Show value change over time
@@ -280,8 +371,9 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="includeDetailedPhotos"
+                      checked={includeImages}
+                      onChange={(e) => setIncludeImages(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      defaultChecked
                     />
                     <label htmlFor="includeDetailedPhotos" className="ml-2 text-sm text-gray-700">
                       Include detailed photos
@@ -297,12 +389,12 @@ export default function ReportsPage() {
                     <select
                       id="exportFormat"
                       className="form-input box-border"
-                      defaultValue="csv"
+                      value={outputFormat}
+                      onChange={(e) => setOutputFormat(e.target.value)}
                     >
                       <option value="csv">CSV (Spreadsheet)</option>
                       <option value="json">JSON</option>
-                      <option value="txt">Plain Text</option>
-                      <option value="html">HTML</option>
+                      <option value="pdf">PDF</option>
                     </select>
                   </div>
                   
@@ -323,8 +415,9 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="includeDescription"
+                      checked={includeDescription}
+                      onChange={(e) => setIncludeDescription(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      defaultChecked
                     />
                     <label htmlFor="includeDescription" className="ml-2 text-sm text-gray-700">
                       Include descriptions
@@ -335,8 +428,9 @@ export default function ReportsPage() {
                     <input
                       type="checkbox"
                       id="includeImageLinks"
+                      checked={includeImages}
+                      onChange={(e) => setIncludeImages(e.target.checked)}
                       className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                      defaultChecked
                     />
                     <label htmlFor="includeImageLinks" className="ml-2 text-sm text-gray-700">
                       Include image links
@@ -365,7 +459,8 @@ export default function ReportsPage() {
                           type="radio"
                           name="outputFormat"
                           id="formatPdf"
-                          defaultChecked
+                          checked={outputFormat === 'pdf'}
+                          onChange={() => handleOutputFormatChange('pdf')}
                           className="mr-2"
                         />
                         PDF Document
@@ -386,6 +481,8 @@ export default function ReportsPage() {
                           type="radio"
                           name="outputFormat"
                           id="formatCsv"
+                          checked={outputFormat === 'csv'}
+                          onChange={() => handleOutputFormatChange('csv')}
                           className="mr-2"
                         />
                         Spreadsheet (CSV)
@@ -406,6 +503,8 @@ export default function ReportsPage() {
                           type="radio"
                           name="outputFormat"
                           id="formatOnline"
+                          checked={outputFormat === 'json'}
+                          onChange={() => handleOutputFormatChange('json')}
                           className="mr-2"
                         />
                         Online View
