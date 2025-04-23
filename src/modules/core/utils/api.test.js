@@ -1,151 +1,133 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { api, authenticatedRequest } from './api';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { apiRequest, get, post, put, patch, del } from './api';
 import { supabase } from '@/supabaseClient';
+import * as Sentry from '@sentry/browser';
 
-// Mock supabase
+// Mock dependencies
 vi.mock('@/supabaseClient', () => ({
   supabase: {
     auth: {
       getSession: vi.fn()
     }
-  },
-  recordLogin: vi.fn()
+  }
 }));
 
-// Mock fetch
-global.fetch = vi.fn();
-global.console.error = vi.fn();
-global.console.log = vi.fn();
-
-// Mock Sentry
 vi.mock('@sentry/browser', () => ({
   captureException: vi.fn()
 }));
 
-describe('API Utilities', () => {
+describe('API utilities', () => {
+  // Mock fetch
+  const mockFetch = vi.fn();
+  global.fetch = mockFetch;
+
+  // Setup mock responses
   beforeEach(() => {
+    // Reset mocks
     vi.clearAllMocks();
     
-    // Setup default successful response
-    global.fetch.mockResolvedValue({
+    // Mock successful auth response
+    supabase.auth.getSession.mockResolvedValue({
+      data: {
+        session: {
+          access_token: 'header.payload.signature'
+        }
+      },
+      error: null
+    });
+    
+    // Mock successful API response
+    mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ success: true })
+      json: async () => ({ success: true, data: { id: 1 } }),
+      text: async () => '{"success":true}'
     });
   });
-  
-  describe('authenticatedRequest', () => {
-    it('should include Authorization header with correct token', async () => {
-      // Mock session
-      supabase.auth.getSession.mockResolvedValue({
-        data: {
-          session: {
-            access_token: 'test-token'
-          }
-        },
-        error: null
-      });
+
+  describe('apiRequest', () => {
+    it('should make a request with the correct authorization header', async () => {
+      await apiRequest('/api/test');
       
-      // Make request
-      await authenticatedRequest('/api/test');
-      
-      // Assert correct Authorization header was set
-      expect(global.fetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
         headers: expect.objectContaining({
-          'Authorization': 'Bearer test-token'
+          'Authorization': 'Bearer header.payload.signature'
         })
       }));
     });
     
-    it('should throw error when no session is available', async () => {
-      // Mock no session
+    it('should throw an error when session is not available', async () => {
       supabase.auth.getSession.mockResolvedValue({
         data: { session: null },
         error: null
       });
       
-      // Assert error is thrown
-      await expect(authenticatedRequest('/api/test')).rejects.toThrow('No active session or access token found');
+      await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed');
     });
     
-    it('should throw error when session error occurs', async () => {
-      // Mock session error
+    it('should throw an error when session is invalid', async () => {
       supabase.auth.getSession.mockResolvedValue({
-        data: null,
-        error: new Error('Session retrieval failed')
-      });
-      
-      // Assert error is thrown
-      await expect(authenticatedRequest('/api/test')).rejects.toThrow('Failed to get session');
-    });
-    
-    it('should handle API error responses correctly', async () => {
-      // Mock session
-      supabase.auth.getSession.mockResolvedValue({
-        data: {
-          session: {
-            access_token: 'test-token'
-          }
-        },
+        data: { session: {} },  // Missing access_token
         error: null
       });
       
-      // Mock error response
-      global.fetch.mockResolvedValue({
+      await expect(apiRequest('/api/test')).rejects.toThrow('Authentication failed');
+    });
+    
+    it('should throw an error when fetch fails', async () => {
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 401,
-        text: async () => JSON.stringify({ error: 'Unauthorized' })
+        text: async () => 'Unauthorized'
       });
       
-      // Assert error is thrown with correct message
-      await expect(authenticatedRequest('/api/test')).rejects.toThrow('Unauthorized');
+      await expect(apiRequest('/api/test')).rejects.toThrow('API request failed with status 401');
+      expect(Sentry.captureException).toHaveBeenCalled();
     });
   });
-  
-  describe('api methods', () => {
-    beforeEach(() => {
-      // Mock successful session for all tests
-      supabase.auth.getSession.mockResolvedValue({
-        data: {
-          session: {
-            access_token: 'test-token'
-          }
-        },
-        error: null
-      });
-    });
-    
-    it('should make GET request correctly', async () => {
-      await api.get('/api/test');
+
+  describe('HTTP method wrappers', () => {
+    it('should make GET request', async () => {
+      await get('/api/test');
       
-      expect(global.fetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
         method: 'GET'
       }));
     });
     
-    it('should make POST request with correct body', async () => {
-      const testData = { name: 'Test' };
-      await api.post('/api/test', testData);
+    it('should make POST request with body', async () => {
+      const data = { name: 'Test' };
+      await post('/api/test', data);
       
-      expect(global.fetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify(testData)
+        body: JSON.stringify(data)
       }));
     });
     
-    it('should make PATCH request with correct body', async () => {
-      const testData = { name: 'Updated Test' };
-      await api.patch('/api/test/1', testData);
+    it('should make PUT request with body', async () => {
+      const data = { name: 'Test' };
+      await put('/api/test', data);
       
-      expect(global.fetch).toHaveBeenCalledWith('/api/test/1', expect.objectContaining({
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }));
+    });
+    
+    it('should make PATCH request with body', async () => {
+      const data = { name: 'Test' };
+      await patch('/api/test', data);
+      
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify(testData)
+        body: JSON.stringify(data)
       }));
     });
     
-    it('should make DELETE request correctly', async () => {
-      await api.delete('/api/test/1');
+    it('should make DELETE request', async () => {
+      await del('/api/test');
       
-      expect(global.fetch).toHaveBeenCalledWith('/api/test/1', expect.objectContaining({
+      expect(mockFetch).toHaveBeenCalledWith('/api/test', expect.objectContaining({
         method: 'DELETE'
       }));
     });

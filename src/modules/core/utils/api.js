@@ -2,156 +2,132 @@ import { supabase } from '@/supabaseClient';
 import * as Sentry from '@sentry/browser';
 
 /**
- * Make an authenticated API request ensuring the token is properly formatted
- * @param {string} url - The API endpoint
- * @param {Object} options - Fetch options (method, body, etc.)
- * @returns {Promise<Response>} - The fetch response
+ * Makes an authenticated API request to the backend
+ * @param {string} url - The API endpoint URL
+ * @param {Object} options - Request options
+ * @param {string} options.method - The HTTP method (GET, POST, etc.)
+ * @param {Object} options.body - The request body (for POST, PUT, etc.)
+ * @param {Object} options.headers - Additional headers to include
+ * @returns {Promise<Object>} - The response data
  */
-export async function authenticatedRequest(url, options = {}) {
+export async function apiRequest(url, options = {}) {
   try {
-    console.log(`Making authenticated request to: ${url}`);
-    
     // Get current session
-    const { data, error: sessionError } = await supabase.auth.getSession();
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-      console.error('Session error:', sessionError);
-      throw new Error(`Failed to get session: ${sessionError.message}`);
+      console.error('Failed to get session:', sessionError);
+      throw new Error('Authentication failed: Unable to get session');
     }
     
-    if (!data?.session?.access_token) {
-      console.error('No active session found when attempting API request');
-      throw new Error('No active session or access token found');
+    if (!session || !session.access_token) {
+      console.error('No valid session or access token available');
+      throw new Error('Authentication failed: No valid session');
     }
     
-    // Create headers with authentication
+    // Log token format for debugging (partially hidden for security)
+    const tokenParts = session.access_token.split('.');
+    console.log(`API Request to ${url} with token format: ${tokenParts.length} parts`);
+    
+    // Prepare headers with authentication
     const headers = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${data.session.access_token}`,
-      ...options.headers
+      'Authorization': `Bearer ${session.access_token}`,
+      ...options.headers,
     };
     
-    console.log('Request headers set with Authorization token');
-    
-    // Make the request with authenticated headers
-    const response = await fetch(url, {
+    // Prepare request
+    const requestOptions = {
+      method: options.method || 'GET',
+      headers,
       ...options,
-      headers
-    });
+    };
     
-    // Handle non-2xx responses
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorJSON;
-      
-      try {
-        errorJSON = JSON.parse(errorText);
-      } catch (e) {
-        // If not JSON, use text as is
-      }
-      
-      const errorMessage = errorJSON?.error || errorText || `Request failed with status ${response.status}`;
-      console.error(`API error (${response.status}):`, errorMessage);
-      
-      const error = new Error(errorMessage);
-      error.status = response.status;
-      error.response = response;
-      throw error;
+    // Add body if needed
+    if (options.body && (requestOptions.method !== 'GET')) {
+      requestOptions.body = JSON.stringify(options.body);
     }
     
-    return response;
+    console.log(`Making ${requestOptions.method} request to ${url}`);
+    const response = await fetch(url, requestOptions);
+    
+    // Check if response is ok
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API request failed (${response.status}):`, errorText);
+      throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+    }
+    
+    // Parse response
+    const data = await response.json();
+    return data;
   } catch (error) {
-    // Log the error with Sentry
+    console.error('API request error:', error);
     Sentry.captureException(error, {
       extra: {
         url,
         method: options.method || 'GET',
-        requestBody: options.body ? JSON.parse(options.body) : undefined
-      }
+      },
     });
-    
-    console.error('API request failed:', error);
     throw error;
   }
 }
 
 /**
- * Wrapper for common request methods
+ * Makes a GET request to the API
+ * @param {string} url - The API endpoint URL
+ * @returns {Promise<Object>} - The response data
  */
-export const api = {
-  /**
-   * Make a GET request
-   * @param {string} url - The API endpoint
-   * @param {Object} options - Additional fetch options
-   * @returns {Promise<any>} - The parsed JSON response
-   */
-  async get(url, options = {}) {
-    const response = await authenticatedRequest(url, {
-      method: 'GET',
-      ...options
-    });
-    return response.json();
-  },
-  
-  /**
-   * Make a POST request
-   * @param {string} url - The API endpoint
-   * @param {Object} data - The data to send
-   * @param {Object} options - Additional fetch options
-   * @returns {Promise<any>} - The parsed JSON response
-   */
-  async post(url, data, options = {}) {
-    const response = await authenticatedRequest(url, {
-      method: 'POST',
-      body: JSON.stringify(data),
-      ...options
-    });
-    return response.json();
-  },
-  
-  /**
-   * Make a PUT request
-   * @param {string} url - The API endpoint
-   * @param {Object} data - The data to send
-   * @param {Object} options - Additional fetch options
-   * @returns {Promise<any>} - The parsed JSON response
-   */
-  async put(url, data, options = {}) {
-    const response = await authenticatedRequest(url, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-      ...options
-    });
-    return response.json();
-  },
-  
-  /**
-   * Make a PATCH request
-   * @param {string} url - The API endpoint
-   * @param {Object} data - The data to send
-   * @param {Object} options - Additional fetch options
-   * @returns {Promise<any>} - The parsed JSON response
-   */
-  async patch(url, data, options = {}) {
-    const response = await authenticatedRequest(url, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-      ...options
-    });
-    return response.json();
-  },
-  
-  /**
-   * Make a DELETE request
-   * @param {string} url - The API endpoint
-   * @param {Object} options - Additional fetch options
-   * @returns {Promise<any>} - The parsed JSON response
-   */
-  async delete(url, options = {}) {
-    const response = await authenticatedRequest(url, {
-      method: 'DELETE',
-      ...options
-    });
-    return response.json();
-  }
-};
+export function get(url) {
+  return apiRequest(url);
+}
+
+/**
+ * Makes a POST request to the API
+ * @param {string} url - The API endpoint URL
+ * @param {Object} data - The request body
+ * @returns {Promise<Object>} - The response data
+ */
+export function post(url, data) {
+  return apiRequest(url, {
+    method: 'POST',
+    body: data,
+  });
+}
+
+/**
+ * Makes a PUT request to the API
+ * @param {string} url - The API endpoint URL
+ * @param {Object} data - The request body
+ * @returns {Promise<Object>} - The response data
+ */
+export function put(url, data) {
+  return apiRequest(url, {
+    method: 'PUT',
+    body: data,
+  });
+}
+
+/**
+ * Makes a PATCH request to the API
+ * @param {string} url - The API endpoint URL
+ * @param {Object} data - The request body
+ * @returns {Promise<Object>} - The response data
+ */
+export function patch(url, data) {
+  return apiRequest(url, {
+    method: 'PATCH',
+    body: data,
+  });
+}
+
+/**
+ * Makes a DELETE request to the API
+ * @param {string} url - The API endpoint URL
+ * @returns {Promise<Object>} - The response data
+ */
+export function del(url) {
+  return apiRequest(url, {
+    method: 'DELETE',
+  });
+}

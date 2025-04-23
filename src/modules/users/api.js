@@ -1,11 +1,30 @@
-import { api } from '@/modules/core/utils/api';
+import { get, patch } from '@/modules/core/utils/api';
 
-export const usersApi = {
-  async getUserProfile() {
-    return api.get('/api/user');
-  },
-  
-  async updateUserProfile(userData) {
-    return api.patch('/api/user', userData);
+/**
+ * Fetches the current user's profile
+ * @returns {Promise<Object>} The user profile data
+ */
+export async function getCurrentUser() {
+  try {
+    console.log('Fetching current user profile');
+    return await get('/api/user');
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    throw error;
   }
-};
+}
+
+/**
+ * Updates the current user's profile
+ * @param {Object} profileData - The profile data to update
+ * @returns {Promise<Object>} The updated user profile
+ */
+export async function updateUserProfile(profileData) {
+  try {
+    console.log('Updating user profile with data:', profileData);
+    return await patch('/api/user', profileData);
+  } catch (error) {
+    console.error('Error updating user profile:', error);
+    throw error;
+  }
+}
