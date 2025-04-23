@@ -1,11 +1,10 @@
-import { describe, it, vi, beforeEach } from 'vitest';
+import { describe, it, vi, beforeEach, expect } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ReportsPage from '../components/ReportsPage';
 import { collectionsApi } from '@/modules/collections/api';
 import toast from 'react-hot-toast';
 import html2pdf from 'html2pdf.js';
-import { expect } from 'vitest';
 
 // Mock dependencies
 vi.mock('@/modules/auth/hooks/useAuth', () => ({
